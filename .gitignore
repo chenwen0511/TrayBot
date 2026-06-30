@@ -1,0 +1,14 @@
+node_modules/
+dist/
+*.local
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+*.egg-info/
+
+# 视频文件较大，不纳入 git（运行时从 example/ 复制到 public/videos/）
+front/public/videos/*.mp4
+
+
+*.mp4

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" fill="none">
+  <rect width="320" height="180" fill="#1a2332"/>
+  <rect x="110" y="30" width="100" height="120" rx="8" fill="#243044" stroke="#06b6d4" stroke-width="2"/>
+  <rect x="130" y="70" width="60" height="30" rx="2" fill="#06b6d4" opacity="0.3" stroke="#06b6d4" stroke-width="1" stroke-dasharray="4 2">
+    <animate attributeName="y" values="70;55;70" dur="1.5s" repeatCount="indefinite"/>
+  </rect>
+  <text x="160" y="170" text-anchor="middle" fill="#06b6d4" font-size="12" font-family="sans-serif">c(Öú...</text>
+</svg>
