@@ -1,11 +1,52 @@
-import type { LiveEventType } from '../types'
+import type { LiveEventType, ActiveRoute } from '../types'
 
 interface EventSnapshotProps {
   type: LiveEventType
+  activeRoute?: ActiveRoute
   className?: string
 }
 
-export default function EventSnapshot({ type, className = '' }: EventSnapshotProps) {
+function NavSnapshot({ route }: { route: ActiveRoute }) {
+  const isDeliveryPickup = route === 'delivery-pickup'
+  const isPickupDelivery = route === 'pickup-delivery'
+  return (
+    <svg viewBox="0 0 320 180" className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+      <rect width="320" height="180" fill="#1a2332" />
+      <line x1="40" y1="140" x2="280" y2="140" stroke="#334155" strokeWidth="2" />
+      {isDeliveryPickup ? (
+        <>
+          <circle cx="260" cy="100" r="6" fill="#10b981" />
+          <circle cx="60" cy="100" r="6" fill="#f59e0b" />
+          <path d="M260 100 L60 100" stroke="#f59e0b" strokeWidth="2" fill="none" strokeDasharray="8 4" />
+          <circle cx="160" cy="100" r="8" fill="#00d4aa">
+            <animate attributeName="cx" values="260;60;260" dur="4s" repeatCount="indefinite" />
+          </circle>
+        </>
+      ) : isPickupDelivery ? (
+        <>
+          <circle cx="60" cy="100" r="6" fill="#f59e0b" />
+          <circle cx="260" cy="100" r="6" fill="#10b981" />
+          <path d="M60 100 L260 100" stroke="#f59e0b" strokeWidth="2" fill="none" strokeDasharray="8 4" />
+          <circle cx="160" cy="100" r="8" fill="#00d4aa">
+            <animate attributeName="cx" values="60;260;60" dur="4s" repeatCount="indefinite" />
+          </circle>
+        </>
+      ) : (
+        <>
+          <circle cx="60" cy="140" r="6" fill="#6366f1" />
+          <circle cx="260" cy="100" r="6" fill="#f59e0b" />
+          <path d="M60 140 Q160 60 260 100" stroke="#f59e0b" strokeWidth="2" fill="none" strokeDasharray="8 4" />
+          <circle cx="160" cy="100" r="8" fill="#00d4aa">
+            <animate attributeName="cx" values="60;260;60" dur="4s" repeatCount="indefinite" />
+            <animate attributeName="cy" values="140;100;140" dur="4s" repeatCount="indefinite" />
+          </circle>
+        </>
+      )}
+    </svg>
+  )
+}
+
+export default function EventSnapshot({ type, activeRoute, className = '' }: EventSnapshotProps) {
   const base = `w-full h-full ${className}`
 
   switch (type) {
@@ -22,20 +63,9 @@ export default function EventSnapshot({ type, className = '' }: EventSnapshotPro
         </svg>
       )
     case 'nav_to_pickup':
+      return <NavSnapshot route={activeRoute === 'delivery-pickup' ? 'delivery-pickup' : 'home-pickup'} />
     case 'nav_to_delivery':
-      return (
-        <svg viewBox="0 0 320 180" className={base} xmlns="http://www.w3.org/2000/svg">
-          <rect width="320" height="180" fill="#1a2332" />
-          <line x1="40" y1="140" x2="280" y2="140" stroke="#334155" strokeWidth="2" />
-          <circle cx="60" cy="140" r="6" fill="#6366f1" />
-          <circle cx="160" cy="100" r="8" fill="#00d4aa">
-            <animate attributeName="cx" values="60;260;60" dur="4s" repeatCount="indefinite" />
-            <animate attributeName="cy" values="140;100;140" dur="4s" repeatCount="indefinite" />
-          </circle>
-          <circle cx="260" cy="100" r="6" fill="#10b981" />
-          <path d="M60 140 Q160 60 260 100" stroke="#f59e0b" strokeWidth="2" fill="none" strokeDasharray="8 4" />
-        </svg>
-      )
+      return <NavSnapshot route="pickup-delivery" />
     case 'arrived_pickup':
       return (
         <svg viewBox="0 0 320 180" className={base} xmlns="http://www.w3.org/2000/svg">

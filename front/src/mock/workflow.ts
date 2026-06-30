@@ -46,7 +46,11 @@ export function buildWorkflow(
       event: {
         type: 'nav_to_pickup',
         title: batch === 1 ? '正在从 HOME 出发前往取料货架' : '继续前往取料货架',
-        description: `目标：${MOCK_WORK_ORDER.pickup}，本轮取 ${batchSize} 盘（剩余 ${remaining} 盘）`,
+        description:
+          batch === 1
+            ? `目标：${MOCK_WORK_ORDER.pickup}，本轮取 ${batchSize} 盘（工单需料总数：${totalTrays} 盘）`
+            : `目标：${MOCK_WORK_ORDER.pickup}，本轮取 ${batchSize} 盘（剩余 ${remaining} 盘）`,
+        activeRoute: batch === 1 ? 'home-pickup' : 'delivery-pickup',
       },
       map: { move: { from: navFrom, to: 'pickup' } },
     })

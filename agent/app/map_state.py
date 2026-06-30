@@ -46,6 +46,7 @@ EVENT_MAP: dict[LiveEventType, dict] = {
     },
     LiveEventType.TAKING_OUT: {"at": "delivery", "active_route": None, "mode": "operating", "speed": 0.0},
     LiveEventType.PUT_SHELF_SUCCESS: {"at": "delivery", "active_route": None, "mode": "operating", "speed": 0.0},
+    LiveEventType.BATCH_DECISION: {"at": "delivery", "active_route": None, "mode": "operating", "speed": 0.0},
     LiveEventType.RETURN_HOME: {
         "move": ("delivery", "home"),
         "active_route": "delivery-home",
@@ -55,12 +56,29 @@ EVENT_MAP: dict[LiveEventType, dict] = {
 }
 
 
-def state_patch_for_event(event_type: LiveEventType, title: str, task_id: str) -> dict:
+def state_patch_for_event(
+    event_type: LiveEventType,
+    title: str,
+    task_id: str,
+    *,
+    nav_from: str | None = None,
+    active_route: str | None = None,
+) -> dict:
     meta = EVENT_MAP[event_type]
+    route = active_route or meta.get("active_route")
     patch: dict = {
         "robot": {"mode": meta["mode"], "speed": meta["speed"], "taskId": task_id},
-        "map": {"currentStepTitle": title, "activeRoute": meta.get("active_route")},
+        "map": {"currentStepTitle": title, "activeRoute": route},
     }
+    if event_type == LiveEventType.NAV_TO_PICKUP and (
+        nav_from == "delivery" or active_route == "delivery-pickup"
+    ):
+        patch["map"]["robotPos"] = LANDMARKS["delivery"]
+        patch["map"]["move"] = {"from": "delivery", "to": "pickup"}
+        patch["map"]["activeRoute"] = "delivery-pickup"
+        patch["robot"]["mode"] = "navigating"
+        patch["robot"]["speed"] = 0.35
+        return patch
     if "at" in meta:
         pos = LANDMARKS[meta["at"]]
         patch["map"]["robotPos"] = pos

@@ -19,6 +19,7 @@ function parseEvent(raw: Record<string, unknown>): LiveEvent {
     title: String(raw.title),
     description: raw.description ? String(raw.description) : undefined,
     thinking: raw.thinking ? String(raw.thinking) : undefined,
+    activeRoute: raw.activeRoute ? (raw.activeRoute as LiveEvent['activeRoute']) : undefined,
     timestamp: new Date(String(raw.timestamp)),
   }
 }

@@ -4,19 +4,39 @@ from __future__ import annotations
 
 from langgraph.graph import END, START, StateGraph
 
-from app.workflow.nodes import NODE_REGISTRY
+from app.workflow.nodes import NODE_REGISTRY, route_after_batch
 from app.workflow.state import WorkflowState
-from traybot_protocol.models import DEFAULT_WORK_ORDER, NODE_SEQUENCE, RobotLocation, WorkOrder
+from traybot_protocol.models import DEFAULT_WORK_ORDER, RobotLocation, WorkOrder
+
+# 线性主干 + put_shelf_success 后条件分支（继续取料 / 返回 HOME）
+_LINEAR_NODES = [
+    "order_received",
+    "nav_to_pickup",
+    "arrived_pickup",
+    "target_locked",
+    "grab_success",
+    "put_backpack",
+    "nav_to_delivery",
+    "arrived_delivery",
+    "taking_out",
+    "put_shelf_success",
+]
 
 
 def build_workflow_graph():
     graph = StateGraph(WorkflowState)
-    for name in NODE_SEQUENCE:
+    for name in (*_LINEAR_NODES, "batch_decision", "return_home"):
         graph.add_node(name, NODE_REGISTRY[name])
-    graph.add_edge(START, NODE_SEQUENCE[0])
-    for i in range(len(NODE_SEQUENCE) - 1):
-        graph.add_edge(NODE_SEQUENCE[i], NODE_SEQUENCE[i + 1])
-    graph.add_edge(NODE_SEQUENCE[-1], END)
+    graph.add_edge(START, _LINEAR_NODES[0])
+    for i in range(len(_LINEAR_NODES) - 1):
+        graph.add_edge(_LINEAR_NODES[i], _LINEAR_NODES[i + 1])
+    graph.add_edge("put_shelf_success", "batch_decision")
+    graph.add_conditional_edges(
+        "batch_decision",
+        route_after_batch,
+        {"nav_to_pickup": "nav_to_pickup", "return_home": "return_home"},
+    )
+    graph.add_edge("return_home", END)
     return graph.compile()
 
 
@@ -28,6 +48,8 @@ def make_initial_state(work_order: WorkOrder | None = None) -> WorkflowState:
         location=RobotLocation.HOME,
         battery=78.0,
         batch_size=batch,
+        batch_number=1,
+        nav_from=None,
         events=[],
         step_index=0,
     )

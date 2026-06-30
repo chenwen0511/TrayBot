@@ -54,12 +54,20 @@ export type LiveEventType =
   | 'batch_decision'
   | 'return_home'
 
+export type ActiveRoute =
+  | 'home-pickup'
+  | 'pickup-delivery'
+  | 'delivery-home'
+  | 'delivery-pickup'
+  | null
+
 export interface LiveEvent {
   id: string
   type: LiveEventType
   title: string
   description?: string
   thinking?: string
+  activeRoute?: ActiveRoute
   timestamp: Date
 }
 

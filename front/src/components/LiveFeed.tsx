@@ -153,7 +153,7 @@ function FeedItem({
       }`}
     >
       <div className="w-20 h-14 shrink-0 rounded overflow-hidden border border-border bg-surface">
-        <EventSnapshot type={event.type} />
+        <EventSnapshot type={event.type} activeRoute={event.activeRoute} />
       </div>
 
       <div className="flex-1 min-w-0">

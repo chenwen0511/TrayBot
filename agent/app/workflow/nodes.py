@@ -17,6 +17,7 @@ def _emit(
     title: str,
     description: str | None = None,
     thinking: str | None = None,
+    active_route: str | None = None,
     visible: bool = True,
     location: RobotLocation | None = None,
     delivered_trays: int | None = None,
@@ -26,6 +27,7 @@ def _emit(
         title=title,
         description=description,
         thinking=thinking,
+        active_route=active_route,
         visible=visible,
     )
     patch: dict = {"events": [event], "step_index": _next_step(state)}
@@ -60,20 +62,36 @@ def nav_to_pickup(state: WorkflowState) -> dict:
     wo: WorkOrder = state["work_order"]
     batch = state["batch_size"]
     remaining = wo.total_trays - wo.delivered_trays
-    return _emit(
+    batch_num = state["batch_number"]
+    from_delivery = batch_num > 1
+    title = "继续前往取料货架" if from_delivery else "正在从 HOME 出发前往取料货架"
+    if from_delivery:
+        description = f"目标：{wo.pickup}，本轮取 {batch} 盘（剩余 {remaining} 盘）"
+        active_route = "delivery-pickup"
+        nav_from = "delivery"
+    else:
+        description = f"目标：{wo.pickup}，本轮取 {batch} 盘（工单需料总数：{wo.total_trays} 盘）"
+        active_route = "home-pickup"
+        nav_from = "home"
+    patch = _emit(
         state,
         event_type=LiveEventType.NAV_TO_PICKUP,
-        title="正在从 HOME 出发前往取料货架",
-        description=f"目标：{wo.pickup}，本轮取 {batch} 盘（剩余 {remaining} 盘）",
+        title=title,
+        description=description,
+        active_route=active_route,
     )
+    patch["nav_from"] = nav_from
+    return patch
 
 
 def arrived_pickup(state: WorkflowState) -> dict:
     wo: WorkOrder = state["work_order"]
-    thinking = (
-        "定位误差 2.1cm，在允许范围内。扫描货架层位：第 3 层检测到 2 个托盘候选。"
-        "比对工单物料编码，锁定目标位 A-03-L3-S2。"
-    )
+    thinking = None
+    if state["batch_number"] <= 1:
+        thinking = (
+            "定位误差 2.1cm，在允许范围内。扫描货架层位：第 3 层检测到 2 个托盘候选。"
+            "比对工单物料编码，锁定目标位 A-03-L3-S2。"
+        )
     return _emit(
         state,
         event_type=LiveEventType.ARRIVED_PICKUP,
@@ -126,6 +144,7 @@ def nav_to_delivery(state: WorkflowState) -> dict:
         event_type=LiveEventType.NAV_TO_DELIVERY,
         title="正在转场",
         description=f"目标：{wo.delivery}，运送 {batch} 盘",
+        active_route="pickup-delivery",
     )
 
 
@@ -165,22 +184,64 @@ def put_shelf_success(state: WorkflowState) -> dict:
     )
 
 
-def return_home(state: WorkflowState) -> dict:
+def batch_decision(state: WorkflowState) -> dict:
     wo: WorkOrder = state["work_order"]
     remaining = wo.total_trays - wo.delivered_trays
-    order_status = f"工单尚有 {remaining} 盘待送，" if remaining > 0 else "工单已全部送达，"
+    batch_size = state["batch_size"]
+    capacity = wo.backpack_capacity
+
+    if remaining > 0:
+        next_batch = min(capacity, remaining)
+        thinking = (
+            f"工单总量 {wo.total_trays} 盘，背包容量 {capacity} 盘/次。"
+            f"本轮已送 {batch_size} 盘，累计 {wo.delivered_trays}/{wo.total_trays}，剩余 {remaining} 盘。"
+            f"{remaining} ≤ {capacity}，无需回 HOME 充电或待命，直接从送料点前往取料货架继续下一批次。"
+            f"决策：前往 {wo.pickup}。"
+        )
+        patch = _emit(
+            state,
+            event_type=LiveEventType.BATCH_DECISION,
+            title="决策：继续取料",
+            description=(
+                f"工单需 {wo.total_trays} 盘，已送 {wo.delivered_trays} 盘，还差 {remaining} 盘"
+            ),
+            thinking=thinking,
+            location=RobotLocation.DELIVERY,
+        )
+        patch["batch_size"] = next_batch
+        patch["batch_number"] = state["batch_number"] + 1
+        return patch
+
     thinking = (
-        f"累计送达 {wo.delivered_trays}/{wo.total_trays} 盘。{order_status}"
+        f"累计送达 {wo.delivered_trays}/{wo.total_trays} 盘，工单已完成。"
         "查询任务队列：无其他待执行工单。"
         f"电量 {state['battery'] - 4:.0f}%，足够返回 HOME。"
         f"决策：从 {wo.delivery} 返回 HOME 待命。"
     )
     return _emit(
         state,
+        event_type=LiveEventType.BATCH_DECISION,
+        title="决策：返回 HOME",
+        description=f"工单 {wo.total_trays} 盘全部送达完成",
+        thinking=thinking,
+        location=RobotLocation.DELIVERY,
+    )
+
+
+def route_after_batch(state: WorkflowState) -> str:
+    wo = state["work_order"]
+    if wo.total_trays - wo.delivered_trays > 0:
+        return "nav_to_pickup"
+    return "return_home"
+
+
+def return_home(state: WorkflowState) -> dict:
+    return _emit(
+        state,
         event_type=LiveEventType.RETURN_HOME,
         title="没有任务，机器人返回 HOME",
         description="任务队列空，自动返回 HOME 待命",
-        thinking=thinking,
+        active_route="delivery-home",
         location=RobotLocation.HOME,
     )
 
@@ -196,5 +257,6 @@ NODE_REGISTRY = {
     "arrived_delivery": arrived_delivery,
     "taking_out": taking_out,
     "put_shelf_success": put_shelf_success,
+    "batch_decision": batch_decision,
     "return_home": return_home,
 }

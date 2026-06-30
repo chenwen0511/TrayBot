@@ -17,5 +17,7 @@ class WorkflowState(TypedDict):
     location: RobotLocation
     battery: float
     batch_size: int
+    batch_number: int
+    nav_from: str | None
     events: Annotated[list[LiveEvent], _merge_events]
     step_index: int

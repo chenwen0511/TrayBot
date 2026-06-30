@@ -89,7 +89,13 @@ async def run_workflow_on_cloud(reporter: CloudReporter, work_order: WorkOrder) 
             had_navigation = False
             for event in events:
                 await reporter.publish_event(event, task_id)
-                patch = state_patch_for_event(event.type, event.title, task_id)
+                patch = state_patch_for_event(
+                    event.type,
+                    event.title,
+                    task_id,
+                    nav_from=update.get("nav_from"),
+                    active_route=event.active_route,
+                )
                 if patch.get("map", {}).get("move"):
                     had_navigation = True
                     await _animate_navigation(reporter, patch, task_id)

@@ -20,6 +20,7 @@ class LiveEventType(StrEnum):
     ARRIVED_DELIVERY = "arrived_delivery"
     TAKING_OUT = "taking_out"
     PUT_SHELF_SUCCESS = "put_shelf_success"
+    BATCH_DECISION = "batch_decision"
     RETURN_HOME = "return_home"
 
 
@@ -41,6 +42,7 @@ class LiveEvent(BaseModel):
     title: str
     description: str | None = None
     thinking: str | None = None
+    active_route: str | None = None
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     visible: bool = True
 
@@ -56,6 +58,8 @@ class LiveEvent(BaseModel):
             data["description"] = self.description
         if self.thinking:
             data["thinking"] = self.thinking
+        if self.active_route:
+            data["activeRoute"] = self.active_route
         return data
 
 
@@ -100,11 +104,12 @@ NODE_SEQUENCE: list[str] = [
     "arrived_delivery",
     "taking_out",
     "put_shelf_success",
+    "batch_decision",
     "return_home",
 ]
 
 THINKING_NODES: frozenset[str] = frozenset({
     "order_received",
     "arrived_pickup",
-    "return_home",
+    "batch_decision",
 })
