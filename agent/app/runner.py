@@ -4,22 +4,33 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from typing import Protocol
 
 from app.map_state import state_patch_for_event
+from app.mqtt_reporter import MqttCloudReporter
 from app.reporter import CloudReporter
 from app.workflow.graph import build_workflow_graph, make_initial_state
 from traybot_protocol.models import LiveEvent, WorkOrder, WorkOrderStatus
 
 logger = logging.getLogger(__name__)
 
-# 与前端 Mock 对齐：导航约 7s，原地步骤额外停留
 STEP_INTERVAL = 7.0
 INSTANT_NODE_DELAY = 5.0
 NAV_POST_DELAY = 1.0
-THINKING_CHAR_DELAY = 0.04  # 与 reporter.py 保持一致
+THINKING_CHAR_DELAY = 0.04
 
 NAV_LERP_STEPS = 20
 NAV_LERP_DELAY = STEP_INTERVAL / NAV_LERP_STEPS
+
+
+class CloudReporterProtocol(Protocol):
+    async def connect(self) -> None: ...
+    async def close(self) -> None: ...
+    async def publish_event(self, event: LiveEvent, task_id: str) -> None: ...
+    async def publish_state(self, patch: dict) -> None: ...
+    async def publish_workorder_progress(self, order_id: str, delivered_trays: int) -> None: ...
+    async def publish_workorder_done(self, order_id: str, delivered_trays: int) -> None: ...
+    async def wait_for_workorder(self) -> dict: ...
 
 
 def _work_order_from_payload(payload: dict) -> WorkOrder:
@@ -35,7 +46,7 @@ def _work_order_from_payload(payload: dict) -> WorkOrder:
 
 
 async def _animate_navigation(
-    reporter: CloudReporter,
+    reporter: CloudReporterProtocol,
     patch: dict,
     task_id: str,
 ) -> None:
@@ -66,7 +77,6 @@ async def _animate_navigation(
 
 
 async def _dwell_after_step(events: list[LiveEvent], *, had_navigation: bool) -> None:
-    """原地执行的 node 停留一段时间，避免图文直播瞬间刷屏。"""
     if had_navigation:
         await asyncio.sleep(NAV_POST_DELAY)
         return
@@ -76,7 +86,7 @@ async def _dwell_after_step(events: list[LiveEvent], *, had_navigation: bool) ->
     await asyncio.sleep(dwell)
 
 
-async def run_workflow_on_cloud(reporter: CloudReporter, work_order: WorkOrder) -> None:
+async def run_workflow_on_cloud(reporter: CloudReporterProtocol, work_order: WorkOrder) -> None:
     app = build_workflow_graph()
     state = make_initial_state(work_order)
     task_id = work_order.id
@@ -116,8 +126,34 @@ async def run_workflow_on_cloud(reporter: CloudReporter, work_order: WorkOrder) 
     })
 
 
-async def agent_loop(cloud_url: str, robot_id: str) -> None:
-    reporter = CloudReporter(cloud_url, robot_id)
+def create_reporter(
+    *,
+    transport: str,
+    robot_id: str,
+    cloud_url: str,
+    mqtt_broker: str,
+    mqtt_port: int,
+) -> CloudReporterProtocol:
+    if transport == "mqtt":
+        return MqttCloudReporter(mqtt_broker, robot_id=robot_id, port=mqtt_port)
+    return CloudReporter(cloud_url, robot_id)
+
+
+async def agent_loop(
+    *,
+    transport: str = "mqtt",
+    robot_id: str = "TrayBot-01",
+    cloud_url: str = "ws://127.0.0.1:8000/ws/agent",
+    mqtt_broker: str = "127.0.0.1",
+    mqtt_port: int = 1883,
+) -> None:
+    reporter = create_reporter(
+        transport=transport,
+        robot_id=robot_id,
+        cloud_url=cloud_url,
+        mqtt_broker=mqtt_broker,
+        mqtt_port=mqtt_port,
+    )
     await reporter.connect()
     try:
         while True:

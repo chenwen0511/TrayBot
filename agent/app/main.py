@@ -85,7 +85,15 @@ def main() -> None:
         choices=["graph", "run", "json", "all", "run-cloud"],
         help="graph/run/json/all=本地测试, run-cloud=连接云端执行",
     )
-    parser.add_argument("--cloud-url", default="ws://127.0.0.1:8000/ws/agent")
+    parser.add_argument(
+        "--transport",
+        choices=["mqtt", "ws"],
+        default="mqtt",
+        help="Agent↔Backend 传输：mqtt（默认）或 ws（Legacy WebSocket）",
+    )
+    parser.add_argument("--mqtt-broker", default="127.0.0.1", help="MQTT Broker 地址")
+    parser.add_argument("--mqtt-port", type=int, default=1883, help="MQTT Broker 端口")
+    parser.add_argument("--cloud-url", default="ws://127.0.0.1:8000/ws/agent", help="Legacy WS 地址")
     parser.add_argument("--robot-id", default="TrayBot-01")
     args = parser.parse_args()
 
@@ -98,7 +106,13 @@ def main() -> None:
     if args.command == "run-cloud":
         acquire_agent_lock()
         try:
-            asyncio.run(agent_loop(args.cloud_url, args.robot_id))
+            asyncio.run(agent_loop(
+                transport=args.transport,
+                robot_id=args.robot_id,
+                cloud_url=args.cloud_url,
+                mqtt_broker=args.mqtt_broker,
+                mqtt_port=args.mqtt_port,
+            ))
         except KeyboardInterrupt:
             print("\nAgent 已停止")
             sys.exit(0)

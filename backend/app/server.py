@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,7 +16,25 @@ from traybot_protocol.models import WorkOrderStatus
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
-app = FastAPI(title="TrayBot Cloud Backend", version="0.1.0")
+MQTT_ENABLED = os.getenv("TRAYBOT_MQTT_ENABLED", "true").lower() in ("1", "true", "yes")
+MQTT_BROKER = os.getenv("TRAYBOT_MQTT_BROKER", "127.0.0.1")
+MQTT_PORT = int(os.getenv("TRAYBOT_MQTT_PORT", "1883"))
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    if MQTT_ENABLED:
+        try:
+            await hub.start_mqtt(MQTT_BROKER, MQTT_PORT)
+        except Exception as exc:
+            logging.getLogger(__name__).warning(
+                "MQTT Bridge 启动失败（Agent 可改用 --transport ws）: %s", exc
+            )
+    yield
+    await hub.stop_mqtt()
+
+
+app = FastAPI(title="TrayBot Cloud Backend", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -29,7 +49,10 @@ app.add_middleware(
 async def health():
     return {
         "status": "ok",
-        "agent_connected": hub.agent_ws is not None,
+        "agent_connected": hub.is_agent_connected,
+        "agent_ws_connected": hub.agent_ws is not None,
+        "agent_mqtt_connected": bool(hub._mqtt_robots),
+        "mqtt_bridge_connected": hub.mqtt_bridge.connected if hub.mqtt_bridge else False,
         "dashboard_clients": len(hub.dashboard_clients),
     }
 
@@ -85,6 +108,7 @@ async def ws_dashboard(ws: WebSocket):
 
 @app.websocket("/ws/agent")
 async def ws_agent(ws: WebSocket):
+    """Legacy：Agent WebSocket 通道（默认请用 MQTT）。"""
     await hub.register_agent(ws)
     try:
         while True:

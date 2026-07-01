@@ -1,17 +1,19 @@
-"""WebSocket 连接管理与消息转发。"""
+"""WebSocket + MQTT 连接管理与消息转发。"""
 
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fastapi import WebSocket
 
 from app.state import DashboardState
 from app.work_orders import WorkOrderStore
 from traybot_protocol.messages import AgentAction, CloudToAgentAction, DashboardAction
+
+if TYPE_CHECKING:
+    from app.mqtt_bridge import MqttBridge
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +27,25 @@ class ConnectionHub:
         self.dashboard_state = DashboardState()
         self._pending_thinking: dict[str, str] = {}
         self._executing_order_id: str | None = None
+        self.mqtt_bridge: MqttBridge | None = None
+        self._mqtt_robots: set[str] = set()
+        self._primary_robot_id: str | None = None
+
+    @property
+    def is_agent_connected(self) -> bool:
+        return self.agent_ws is not None or bool(self._mqtt_robots)
+
+    async def start_mqtt(self, broker: str, port: int) -> None:
+        from app.mqtt_bridge import MqttBridge
+
+        self.mqtt_bridge = MqttBridge(self, broker=broker, port=port)
+        await self.mqtt_bridge.start()
+
+    async def stop_mqtt(self) -> None:
+        if self.mqtt_bridge:
+            await self.mqtt_bridge.stop()
+            self.mqtt_bridge = None
+        self._mqtt_robots.clear()
 
     async def register_dashboard(self, ws: WebSocket) -> None:
         await ws.accept()
@@ -45,9 +66,18 @@ class ConnectionHub:
         await ws.accept()
         self.agent_ws = ws
         self.agent_connected.set()
-        logger.info("Agent 已连接")
+        logger.info("Agent WebSocket 已连接")
+        await self._on_agent_online()
 
-        # 仅在没有正在执行的工单时分派；重连时继续分派当前执行中的工单
+    def unregister_agent(self, ws: WebSocket) -> None:
+        if self.agent_ws is ws:
+            self.agent_ws = None
+            if not self._mqtt_robots:
+                self.agent_connected.clear()
+                self._executing_order_id = None
+            logger.info("Agent WebSocket 已断开")
+
+    async def _on_agent_online(self) -> None:
         if self._executing_order_id:
             current = self.work_orders.get_by_id(self._executing_order_id)
             if current and current.status.value == "in_progress":
@@ -62,15 +92,9 @@ class ConnectionHub:
         if current:
             await self._assign_to_agent(current)
 
-    def unregister_agent(self, ws: WebSocket) -> None:
-        if self.agent_ws is ws:
-            self.agent_ws = None
-            self.agent_connected.clear()
-            self._executing_order_id = None
-            logger.info("Agent 已断开")
-
     async def _assign_to_agent(self, order) -> None:
-        if not self.agent_ws:
+        if not self.is_agent_connected:
+            logger.warning("无 Agent 连接，无法分派工单 %s", order.id)
             return
         if self._executing_order_id is not None:
             logger.warning("Agent 正在执行 %s，跳过分派 %s", self._executing_order_id, order.id)
@@ -96,16 +120,28 @@ class ConnectionHub:
         await ws.send_json({"action": str(action), "payload": payload})
 
     async def _send_agent(self, action: CloudToAgentAction | str, payload: dict[str, Any]) -> None:
-        if not self.agent_ws:
+        robot_id = self._primary_robot_id or "TrayBot-01"
+        if self.mqtt_bridge and self.mqtt_bridge.connected:
+            await self.mqtt_bridge.publish_service(robot_id, action, payload)
             return
-        await self.agent_ws.send_json({"action": str(action), "payload": payload})
+        if self.agent_ws:
+            await self.agent_ws.send_json({"action": str(action), "payload": payload})
+            return
+        logger.warning("无法下发 Agent 消息 %s：无可用连接", action)
 
     async def handle_agent_message(self, msg: dict[str, Any]) -> None:
         action = msg.get("action")
         payload = msg.get("payload", {})
 
         if action == AgentAction.HELLO:
-            logger.info("Agent 注册: %s", payload.get("robotId"))
+            robot_id = payload.get("robotId")
+            if robot_id:
+                self._mqtt_robots.add(str(robot_id))
+                if self._primary_robot_id is None:
+                    self._primary_robot_id = str(robot_id)
+                self.agent_connected.set()
+            logger.info("Agent 注册: %s", robot_id)
+            await self._on_agent_online()
             return
 
         if action == AgentAction.EVENT:
@@ -121,7 +157,6 @@ class ConnectionHub:
             title = payload.get("title", "")
             if title:
                 self.dashboard_state.patch_map({"currentStepTitle": title})
-            task_id = payload.get("taskId")
             if task_id:
                 self.dashboard_state.patch_robot({"taskId": task_id, "mode": "operating"})
             return
@@ -188,6 +223,9 @@ class ConnectionHub:
                     started.to_feed_dict(),
                 )
                 await self._assign_to_agent(started)
+            return
+
+        if action == "pong":
             return
 
         logger.warning("未知 Agent 消息: %s", action)
