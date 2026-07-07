@@ -92,19 +92,26 @@ async def run_workflow_on_cloud(reporter: CloudReporterProtocol, work_order: Wor
     task_id = work_order.id
     final_delivered = work_order.delivered_trays
 
+    published_event_ids: set[str] = set()
+
     async for chunk in app.astream(state, stream_mode="updates"):
         for node_name, update in chunk.items():
             logger.info("执行节点: %s", node_name)
             events: list[LiveEvent] = update.get("events", [])
             had_navigation = False
             for event in events:
+                if event.id in published_event_ids:
+                    continue
+                published_event_ids.add(event.id)
                 await reporter.publish_event(event, task_id)
+                backpack_count = update.get("backpack_count")
                 patch = state_patch_for_event(
                     event.type,
                     event.title,
                     task_id,
                     nav_from=update.get("nav_from"),
                     active_route=event.active_route,
+                    backpack_count=backpack_count,
                 )
                 if patch.get("map", {}).get("move"):
                     had_navigation = True

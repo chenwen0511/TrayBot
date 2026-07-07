@@ -13,12 +13,23 @@ class LiveEventType(StrEnum):
     ORDER_RECEIVED = "order_received"
     NAV_TO_PICKUP = "nav_to_pickup"
     ARRIVED_PICKUP = "arrived_pickup"
-    TARGET_LOCKED = "target_locked"
+    # Pick subagent
+    PICK_PERCEIVE = "pick_perceive"
+    PICK_VALIDATE = "pick_validate"
+    PICK_EXECUTE = "pick_execute"
+    PICK_IN_HAND = "pick_in_hand"
+    PICK_RETRY = "pick_retry"
     GRAB_SUCCESS = "grab_success"
     PUT_BACKPACK = "put_backpack"
     NAV_TO_DELIVERY = "nav_to_delivery"
     ARRIVED_DELIVERY = "arrived_delivery"
     TAKING_OUT = "taking_out"
+    # Place subagent
+    PLACE_PERCEIVE = "place_perceive"
+    PLACE_VALIDATE = "place_validate"
+    PLACE_EXECUTE = "place_execute"
+    PLACE_VERIFY = "place_verify"
+    PLACE_RETRY = "place_retry"
     PUT_SHELF_SUCCESS = "put_shelf_success"
     BATCH_DECISION = "batch_decision"
     RETURN_HOME = "return_home"
@@ -94,23 +105,47 @@ DEFAULT_WORK_ORDER = WorkOrder(
     status=WorkOrderStatus.IN_PROGRESS,
 )
 
-NODE_SEQUENCE: list[str] = [
+# 主编排图节点（子图 pick_tray / place_tray 为复合节点）
+ORCHESTRATOR_NODES: list[str] = [
     "order_received",
     "nav_to_pickup",
     "arrived_pickup",
-    "target_locked",
-    "grab_success",
+    "pick_tray",
     "put_backpack",
     "nav_to_delivery",
     "arrived_delivery",
-    "taking_out",
-    "put_shelf_success",
+    "take_from_backpack",
+    "place_tray",
     "batch_decision",
     "return_home",
 ]
 
+PICK_SUBGRAPH_NODES: list[str] = [
+    "pick_perceive",
+    "pick_validate",
+    "pick_execute",
+    "pick_in_hand",
+    "pick_retry",
+    "grab_success",
+]
+
+PLACE_SUBGRAPH_NODES: list[str] = [
+    "place_perceive",
+    "place_validate",
+    "place_execute",
+    "place_verify",
+    "place_retry",
+    "put_shelf_success",
+]
+
+NODE_SEQUENCE: list[str] = ORCHESTRATOR_NODES + PICK_SUBGRAPH_NODES + PLACE_SUBGRAPH_NODES
+
 THINKING_NODES: frozenset[str] = frozenset({
     "order_received",
-    "arrived_pickup",
     "batch_decision",
 })
+
+MAX_PICK_RETRIES = 3
+MAX_PLACE_RETRIES = 3
+
+MIN_BATTERY_PERCENT = 20.0

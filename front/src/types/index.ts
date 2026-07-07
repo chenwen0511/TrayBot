@@ -19,6 +19,8 @@ export interface RobotStatus {
   joints: JointStatus[]
   networkLatency: number
   signalStrength: number
+  /** Agent 上报的背包内料盘数 */
+  backpackTrays?: number
 }
 
 export interface CameraStream {
@@ -44,12 +46,21 @@ export type LiveEventType =
   | 'order_received'
   | 'nav_to_pickup'
   | 'arrived_pickup'
-  | 'target_locked'
+  | 'pick_perceive'
+  | 'pick_validate'
+  | 'pick_execute'
+  | 'pick_in_hand'
+  | 'pick_retry'
   | 'grab_success'
   | 'put_backpack'
   | 'nav_to_delivery'
   | 'arrived_delivery'
   | 'taking_out'
+  | 'place_perceive'
+  | 'place_validate'
+  | 'place_execute'
+  | 'place_verify'
+  | 'place_retry'
   | 'put_shelf_success'
   | 'batch_decision'
   | 'return_home'

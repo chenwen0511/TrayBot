@@ -11,6 +11,29 @@ LANDMARKS = {
     "delivery": {"x": 268, "y": 198},
 }
 
+_OPERATING_AT_PICKUP = frozenset({
+    LiveEventType.ARRIVED_PICKUP,
+    LiveEventType.PICK_PERCEIVE,
+    LiveEventType.PICK_VALIDATE,
+    LiveEventType.PICK_EXECUTE,
+    LiveEventType.PICK_IN_HAND,
+    LiveEventType.PICK_RETRY,
+    LiveEventType.GRAB_SUCCESS,
+    LiveEventType.PUT_BACKPACK,
+})
+
+_OPERATING_AT_DELIVERY = frozenset({
+    LiveEventType.ARRIVED_DELIVERY,
+    LiveEventType.TAKING_OUT,
+    LiveEventType.PLACE_PERCEIVE,
+    LiveEventType.PLACE_VALIDATE,
+    LiveEventType.PLACE_EXECUTE,
+    LiveEventType.PLACE_VERIFY,
+    LiveEventType.PLACE_RETRY,
+    LiveEventType.PUT_SHELF_SUCCESS,
+    LiveEventType.BATCH_DECISION,
+})
+
 EVENT_MAP: dict[LiveEventType, dict] = {
     LiveEventType.ORDER_RECEIVED: {
         "at": "home",
@@ -24,30 +47,12 @@ EVENT_MAP: dict[LiveEventType, dict] = {
         "mode": "navigating",
         "speed": 0.35,
     },
-    LiveEventType.ARRIVED_PICKUP: {
-        "at": "pickup",
-        "active_route": None,
-        "mode": "operating",
-        "speed": 0.0,
-    },
-    LiveEventType.TARGET_LOCKED: {"at": "pickup", "active_route": None, "mode": "operating", "speed": 0.0},
-    LiveEventType.GRAB_SUCCESS: {"at": "pickup", "active_route": None, "mode": "operating", "speed": 0.0},
-    LiveEventType.PUT_BACKPACK: {"at": "pickup", "active_route": None, "mode": "operating", "speed": 0.0},
     LiveEventType.NAV_TO_DELIVERY: {
         "move": ("pickup", "delivery"),
         "active_route": "pickup-delivery",
         "mode": "navigating",
         "speed": 0.35,
     },
-    LiveEventType.ARRIVED_DELIVERY: {
-        "at": "delivery",
-        "active_route": None,
-        "mode": "operating",
-        "speed": 0.0,
-    },
-    LiveEventType.TAKING_OUT: {"at": "delivery", "active_route": None, "mode": "operating", "speed": 0.0},
-    LiveEventType.PUT_SHELF_SUCCESS: {"at": "delivery", "active_route": None, "mode": "operating", "speed": 0.0},
-    LiveEventType.BATCH_DECISION: {"at": "delivery", "active_route": None, "mode": "operating", "speed": 0.0},
     LiveEventType.RETURN_HOME: {
         "move": ("delivery", "home"),
         "active_route": "delivery-home",
@@ -57,6 +62,17 @@ EVENT_MAP: dict[LiveEventType, dict] = {
 }
 
 
+def _operating_meta(at: str) -> dict:
+    return {"at": at, "active_route": None, "mode": "operating", "speed": 0.0}
+
+
+for _evt in _OPERATING_AT_PICKUP:
+    EVENT_MAP[_evt] = _operating_meta("pickup")
+
+for _evt in _OPERATING_AT_DELIVERY:
+    EVENT_MAP[_evt] = _operating_meta("delivery")
+
+
 def state_patch_for_event(
     event_type: LiveEventType,
     title: str,
@@ -64,6 +80,7 @@ def state_patch_for_event(
     *,
     nav_from: str | None = None,
     active_route: str | None = None,
+    backpack_count: int | None = None,
 ) -> dict:
     meta = EVENT_MAP[event_type]
     route = active_route or meta.get("active_route")
@@ -71,6 +88,9 @@ def state_patch_for_event(
         "robot": {"mode": meta["mode"], "speed": meta["speed"], "taskId": task_id},
         "map": {"currentStepTitle": title, "activeRoute": route},
     }
+    if backpack_count is not None:
+        patch["robot"]["backpackTrays"] = backpack_count
+
     if event_type == LiveEventType.NAV_TO_PICKUP and (
         nav_from == "delivery" or active_route == "delivery-pickup"
     ):
@@ -80,6 +100,7 @@ def state_patch_for_event(
         patch["robot"]["mode"] = "navigating"
         patch["robot"]["speed"] = 0.35
         return patch
+
     if "at" in meta:
         pos = LANDMARKS[meta["at"]]
         patch["map"]["robotPos"] = pos

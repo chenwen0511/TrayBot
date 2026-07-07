@@ -192,6 +192,9 @@ export function useDashboardSocket(enabled = true, landmarks: MapPoint[] = DEFAU
             ...(robot.mode ? { mode: robot.mode as RobotMode } : {}),
             ...(robot.speed !== undefined ? { speed: Number(robot.speed) } : {}),
             ...(robot.taskId !== undefined ? { taskId: robot.taskId as string | null } : {}),
+            ...(robot.backpackTrays !== undefined
+              ? { backpackTrays: Number(robot.backpackTrays) }
+              : {}),
           }))
         }
         if (map) {

@@ -131,6 +131,10 @@ export function useMockDashboard(enabled = true, landmarks: MapPoint[] = DEFAULT
     }
     setLiveEvents((prev) => [...prev, event].slice(-40))
 
+    if (step.backpackTrays !== undefined) {
+      setRobotStatus((prev) => ({ ...prev, backpackTrays: step.backpackTrays }))
+    }
+
     if (step.event.type === 'put_shelf_success') {
       const delivered = parseDelivered(step.event.description)
       if (delivered !== null) {

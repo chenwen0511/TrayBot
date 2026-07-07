@@ -53,8 +53,8 @@ export default function LeftSidebar({ robot, cameras, workOrders, liveEvents }: 
     robot.mode === 'charging' ? '充电中' : '异常'
 
   const { trays, capacity } = useMemo(
-    () => getBackpackDisplay(workOrders, liveEvents),
-    [workOrders, liveEvents],
+    () => getBackpackDisplay(workOrders, liveEvents, robot.backpackTrays),
+    [workOrders, liveEvents, robot.backpackTrays],
   )
 
   return (
@@ -85,7 +85,7 @@ export default function LeftSidebar({ robot, cameras, workOrders, liveEvents }: 
               作业状态: <span className="text-accent font-medium">{modeLabel}</span>
             </p>
             <p className="text-xs text-text-dim mt-1">
-              料盘：{' '}
+              背包(当前盘数/容量):
               <span className="font-mono font-medium text-text">
                 {trays}/{capacity}
               </span>

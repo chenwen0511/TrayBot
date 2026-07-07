@@ -67,6 +67,12 @@ export default function EventSnapshot({ type, activeRoute, className = '' }: Eve
     case 'nav_to_delivery':
       return <NavSnapshot route="pickup-delivery" />
     case 'arrived_pickup':
+    case 'pick_perceive':
+    case 'pick_validate':
+    case 'pick_execute':
+    case 'pick_in_hand':
+    case 'pick_retry':
+    case 'grab_success':
       return (
         <svg viewBox="0 0 320 180" className={base} xmlns="http://www.w3.org/2000/svg">
           <rect width="320" height="180" fill="#1a2332" />
@@ -78,6 +84,11 @@ export default function EventSnapshot({ type, activeRoute, className = '' }: Eve
         </svg>
       )
     case 'arrived_delivery':
+    case 'place_perceive':
+    case 'place_validate':
+    case 'place_execute':
+    case 'place_verify':
+    case 'place_retry':
       return (
         <svg viewBox="0 0 320 180" className={base} xmlns="http://www.w3.org/2000/svg">
           <rect width="320" height="180" fill="#1a2332" />
@@ -86,27 +97,6 @@ export default function EventSnapshot({ type, activeRoute, className = '' }: Eve
             <rect key={i} x={110 + i * 35} y="60" width="25" height="20" rx="2" fill="#10b981" opacity={0.3 + i * 0.2} />
           ))}
           <circle cx="160" cy="150" r="8" fill="#00d4aa" />
-        </svg>
-      )
-    case 'target_locked':
-      return (
-        <svg viewBox="0 0 320 180" className={base} xmlns="http://www.w3.org/2000/svg">
-          <rect width="320" height="180" fill="#1a2332" />
-          <rect x="100" y="40" width="120" height="80" rx="4" stroke="#3b82f6" strokeWidth="2" fill="none" strokeDasharray="6 3" />
-          <circle cx="160" cy="80" r="30" stroke="#3b82f6" strokeWidth="2" fill="none" />
-          <line x1="130" y1="50" x2="190" y2="110" stroke="#3b82f6" strokeWidth="1.5" />
-          <line x1="190" y1="50" x2="130" y2="110" stroke="#3b82f6" strokeWidth="1.5" />
-          <circle cx="160" cy="80" r="4" fill="#3b82f6" />
-        </svg>
-      )
-    case 'grab_success':
-      return (
-        <svg viewBox="0 0 320 180" className={base} xmlns="http://www.w3.org/2000/svg">
-          <rect width="320" height="180" fill="#1a2332" />
-          <rect x="120" y="60" width="80" height="50" rx="3" fill="#00d4aa" opacity="0.3" stroke="#00d4aa" strokeWidth="2" />
-          <path d="M100 90 L120 70 L120 110 Z" fill="#00d4aa" opacity="0.6" />
-          <path d="M220 90 L200 70 L200 110 Z" fill="#00d4aa" opacity="0.6" />
-          <path d="M150 95 L157 102 L172 87" stroke="#00d4aa" strokeWidth="3" fill="none" strokeLinecap="round" />
         </svg>
       )
     case 'put_backpack':

@@ -1,13 +1,8 @@
 import { AlertTriangle, FileText, Settings, User } from 'lucide-react'
-import type { RobotStatus } from '../types'
 
 const APP_LOGO = '/images/app-logo.png'
 
-interface HeaderProps {
-  robot: RobotStatus
-}
-
-export default function Header({ robot }: HeaderProps) {
+export default function Header() {
   return (
     <header className="flex items-center justify-between px-4 py-2 bg-surface-2 shrink-0">
       <div className="flex items-center gap-3">
@@ -47,7 +42,6 @@ export default function Header({ robot }: HeaderProps) {
           <div className="w-8 h-8 rounded-full bg-surface-3 border border-border flex items-center justify-center">
             <User className="w-4 h-4 text-text-dim" />
           </div>
-          <span className="text-xs text-text-dim hidden xl:inline">{robot.name}</span>
         </div>
       </div>
     </header>

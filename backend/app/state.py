@@ -19,6 +19,7 @@ class DashboardState:
         "taskId": None,
         "networkLatency": 12,
         "signalStrength": 92,
+        "backpackTrays": 0,
         "joints": [
             {"id": "j1", "name": "基座", "temperature": 38, "angle": 45.2},
             {"id": "j2", "name": "肩部", "temperature": 42, "angle": -12.5},
