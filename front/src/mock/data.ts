@@ -24,7 +24,7 @@ export const mockRobotStatus: RobotStatus = {
 export const mockCameras: CameraStream[] = [
   {
     id: 'left',
-    label: '左手腕',
+    label: '左手腕相机 (RGB)',
     src: '/videos/camera-left.mp4',
     resolution: '640×480',
     fps: 30,
@@ -32,15 +32,15 @@ export const mockCameras: CameraStream[] = [
   },
   {
     id: 'front',
-    label: '头部相机',
+    label: '头部主相机 (深度/RGB)',
     src: '/videos/camera-front.mp4',
-    resolution: '640×480',
+    resolution: '1280×720',
     fps: 30,
     online: true,
   },
   {
     id: 'right',
-    label: '右手腕',
+    label: '右手腕相机 (RGB)',
     src: '/videos/camera-right.mp4',
     resolution: '640×480',
     fps: 30,
@@ -49,8 +49,8 @@ export const mockCameras: CameraStream[] = [
 ]
 
 export const mockMapPoints: MapPoint[] = [
-  { id: 'home', type: 'home', label: 'HOME', x: 80, y: 320 },
-  { id: 'pickup', type: 'pickup', label: '取料货架 A-03', x: 200, y: 80 },
-  { id: 'delivery', type: 'delivery', label: '送料货架 B-07', x: 520, y: 80 },
-  { id: 'robot', type: 'robot', label: 'TrayBot', x: 200, y: 80 },
+  { id: 'home', type: 'home', label: 'HOME', x: 34, y: 208 },
+  { id: 'pickup', type: 'pickup', label: '取料货架 A-03', x: 294, y: 72 },
+  { id: 'delivery', type: 'delivery', label: '送料货架 B-07', x: 268, y: 198 },
+  { id: 'robot', type: 'robot', label: 'TrayBot', x: 294, y: 72 },
 ]

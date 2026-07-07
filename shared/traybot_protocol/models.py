@@ -80,6 +80,7 @@ class WorkOrder(BaseModel):
             "pickup": self.pickup,
             "delivery": self.delivery,
             "status": self.status.value,
+            "backpackCapacity": self.backpack_capacity,
         }
 
 

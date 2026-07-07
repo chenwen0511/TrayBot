@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from app.hub import hub
+from app.map_loader import DEFAULT_MAP_ID, list_maps, load_map
 from traybot_protocol.messages import DashboardAction
 from traybot_protocol.models import WorkOrderStatus
 
@@ -70,6 +71,19 @@ class CreateWorkOrderRequest(BaseModel):
 @app.get("/api/workorders")
 async def list_workorders():
     return {"workOrders": hub.work_orders.to_feed_list()}
+
+
+@app.get("/api/map")
+async def get_map(map_id: str = DEFAULT_MAP_ID):
+    try:
+        return load_map(map_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=f"map not found: {map_id}") from exc
+
+
+@app.get("/api/maps")
+async def get_maps():
+    return {"maps": list_maps(), "default": DEFAULT_MAP_ID}
 
 
 @app.post("/api/workorders", status_code=201)

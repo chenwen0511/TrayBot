@@ -18,10 +18,10 @@ import type { LiveEvent, LiveEventType } from '../types'
 
 interface LiveFeedProps {
   events: LiveEvent[]
-  /** 联调模式：thinking 由 WebSocket delta 推送，不用本地打字机 */
   deltaStream?: boolean
-  /** 当前正在流式输出 thinking 的事件 id */
   thinkingLiveId?: string | null
+  /** light=侧栏浅色主题（无内置标题栏） */
+  variant?: 'dark' | 'light'
 }
 
 const eventIcons: Record<LiveEventType, typeof Radio> = {
@@ -137,36 +137,51 @@ function FeedItem({
   isLatest,
   deltaStream,
   thinkingLiveId,
+  variant = 'dark',
 }: {
   event: LiveEvent
   isLatest: boolean
   deltaStream?: boolean
   thinkingLiveId?: string | null
+  variant?: 'dark' | 'light'
 }) {
   const Icon = eventIcons[event.type]
   const colorClass = eventColors[event.type]
+  const isLight = variant === 'light'
 
   return (
     <div
       className={`flex gap-2 p-2 rounded-lg border animate-slide-up ${
-        isLatest ? 'bg-surface-3 border-accent/40' : 'bg-surface-2 border-border'
+        isLight
+          ? isLatest
+            ? 'bg-blue-50/80 border-accent/30'
+            : 'bg-panel border-panel-border'
+          : isLatest
+            ? 'bg-surface-3 border-accent/40'
+            : 'bg-surface-2 border-border'
       }`}
     >
-      <div className="w-20 h-14 shrink-0 rounded overflow-hidden border border-border bg-surface">
+      <div className={`w-16 h-12 shrink-0 rounded overflow-hidden border ${isLight ? 'border-panel-border bg-panel-bg' : 'border-border bg-surface'}`}>
         <EventSnapshot type={event.type} activeRoute={event.activeRoute} />
       </div>
 
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5 mb-0.5">
+        <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
           <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] border ${colorClass}`}>
             <Icon className="w-2.5 h-2.5" />
             {event.title}
           </span>
-          {isLatest && <span className="text-[10px] text-accent font-medium">最新</span>}
-          <span className="ml-auto text-[10px] text-text-dim/50 font-mono shrink-0">{formatTime(event.timestamp)}</span>
+          {isLatest && (
+            <span className={`text-[10px] font-medium ${isLight ? 'text-accent' : 'text-accent'}`}>最新</span>
+          )}
+          <span className={`ml-auto text-[10px] font-mono shrink-0 ${isLight ? 'text-panel-muted' : 'text-text-dim/50'}`}>
+            [{formatTime(event.timestamp)}]
+          </span>
         </div>
         {event.description && (
-          <p className="text-[11px] text-text-dim leading-relaxed">{event.description}</p>
+          <p className={`text-[11px] leading-relaxed ${isLight ? 'text-panel-dim' : 'text-text-dim'}`}>
+            {event.description}
+          </p>
         )}
         {event.thinking && (
           <StreamingThinking
@@ -180,7 +195,12 @@ function FeedItem({
   )
 }
 
-export default function LiveFeed({ events, deltaStream = false, thinkingLiveId = null }: LiveFeedProps) {
+export default function LiveFeed({
+  events,
+  deltaStream = false,
+  thinkingLiveId = null,
+  variant = 'dark',
+}: LiveFeedProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const lastEvent = events[events.length - 1]
@@ -189,27 +209,18 @@ export default function LiveFeed({ events, deltaStream = false, thinkingLiveId =
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [events.length, lastEvent?.id, lastEvent?.thinking, thinkingLiveId])
 
+  const isLight = variant === 'light'
+
   return (
     <div className="flex flex-col h-full">
-      <div className="px-4 py-2.5 border-b border-border flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-2">
-          <Radio className="w-4 h-4 text-accent" />
-          <h2 className="text-sm font-semibold text-text-dim uppercase tracking-wider">图文直播</h2>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-          <span className="text-xs text-text-dim">实时</span>
-        </div>
-      </div>
-
       <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0 flex flex-col">
         {events.length === 0 ? (
-          <div className="flex-1 flex flex-col items-center justify-center text-text-dim">
+          <div className={`flex-1 flex flex-col items-center justify-center ${isLight ? 'text-panel-dim' : 'text-text-dim'}`}>
             <Radio className="w-8 h-8 mb-2 opacity-40" />
             <p className="text-sm">等待作业事件...</p>
           </div>
         ) : (
-          <div className="mt-auto p-3 space-y-2">
+          <div className={`mt-auto space-y-2 ${isLight ? 'p-2' : 'p-3'}`}>
             {events.map((event, i) => (
               <FeedItem
                 key={event.id}
@@ -217,6 +228,7 @@ export default function LiveFeed({ events, deltaStream = false, thinkingLiveId =
                 isLatest={i === events.length - 1}
                 deltaStream={deltaStream}
                 thinkingLiveId={thinkingLiveId}
+                variant={variant}
               />
             ))}
             <div ref={bottomRef} />

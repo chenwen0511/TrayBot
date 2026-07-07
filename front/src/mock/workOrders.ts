@@ -8,6 +8,7 @@ export const initialWorkOrders: WorkOrder[] = [
     deliveredTrays: 20,
     pickup: '取料货架 A-03',
     delivery: '送料货架 B-07',
+    backpackCapacity: 20,
     status: 'completed',
   },
   {
@@ -16,6 +17,7 @@ export const initialWorkOrders: WorkOrder[] = [
     deliveredTrays: 35,
     pickup: '取料货架 A-02',
     delivery: '送料货架 B-05',
+    backpackCapacity: 20,
     status: 'completed',
   },
   {
@@ -24,6 +26,7 @@ export const initialWorkOrders: WorkOrder[] = [
     deliveredTrays: 0,
     pickup: MOCK_WORK_ORDER.pickup,
     delivery: MOCK_WORK_ORDER.delivery,
+    backpackCapacity: MOCK_WORK_ORDER.backpackCapacity,
     status: 'in_progress',
   },
   {
@@ -32,6 +35,7 @@ export const initialWorkOrders: WorkOrder[] = [
     deliveredTrays: 0,
     pickup: '取料货架 A-05',
     delivery: '送料货架 B-02',
+    backpackCapacity: 20,
     status: 'pending',
   },
   {
@@ -40,6 +44,7 @@ export const initialWorkOrders: WorkOrder[] = [
     deliveredTrays: 0,
     pickup: '取料货架 A-01',
     delivery: '送料货架 B-09',
+    backpackCapacity: 20,
     status: 'pending',
   },
 ]

@@ -3,7 +3,7 @@ import type { ActiveRoute } from '../mock/useMockDashboard'
 import type { LiveEvent, LiveEventType, MapPoint, RobotMode, RobotStatus, WorkOrder } from '../types'
 import { mockMapPoints, mockRobotStatus } from '../mock/data'
 
-const LANDMARKS = mockMapPoints.filter((p) => p.type !== 'robot')
+const DEFAULT_LANDMARKS = mockMapPoints.filter((p) => p.type !== 'robot')
 
 function wsUrl(): string {
   const env = import.meta.env.VITE_WS_URL as string | undefined
@@ -41,6 +41,7 @@ function parseWorkOrder(raw: Record<string, unknown>): WorkOrder {
     deliveredTrays: Number(raw.deliveredTrays),
     pickup: String(raw.pickup),
     delivery: String(raw.delivery),
+    backpackCapacity: Number(raw.backpackCapacity ?? 20),
     status: raw.status as WorkOrder['status'],
   }
 }
@@ -102,11 +103,12 @@ class DashboardSocketClient {
 
 const dashboardSocket = new DashboardSocketClient()
 
-export function useDashboardSocket(enabled = true) {
+export function useDashboardSocket(enabled = true, landmarks: MapPoint[] = DEFAULT_LANDMARKS) {
+  const home = landmarks.find((p) => p.id === 'home')
   const [robotStatus, setRobotStatus] = useState<RobotStatus>(mockRobotStatus)
   const [liveEvents, setLiveEvents] = useState<LiveEvent[]>([])
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([])
-  const [robotPos, setRobotPos] = useState({ x: 80, y: 320 })
+  const [robotPos, setRobotPos] = useState({ x: home?.x ?? 80, y: home?.y ?? 320 })
   const [currentStepTitle, setCurrentStepTitle] = useState('')
   const [activeRoute, setActiveRoute] = useState<ActiveRoute>(null)
   const [connected, setConnected] = useState(false)
@@ -114,10 +116,10 @@ export function useDashboardSocket(enabled = true) {
 
   const mapPoints: MapPoint[] = useMemo(
     () => [
-      ...LANDMARKS,
+      ...landmarks,
       { id: 'robot', type: 'robot', label: 'TrayBot', x: robotPos.x, y: robotPos.y },
     ],
-    [robotPos],
+    [landmarks, robotPos],
   )
 
   const patchWorkOrder = useCallback((raw: Record<string, unknown>) => {

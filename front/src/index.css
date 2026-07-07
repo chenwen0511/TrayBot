@@ -1,16 +1,31 @@
 @import "tailwindcss";
 
 @theme {
-  --color-surface: #0f1419;
-  --color-surface-2: #1a2332;
-  --color-surface-3: #243044;
-  --color-border: #2d3a4f;
-  --color-accent: #00d4aa;
-  --color-accent-dim: #00a888;
+  /* 全局暗黑主题 */
+  --color-surface: #0c0e12;
+  --color-surface-2: #141820;
+  --color-surface-3: #1c2230;
+  --color-border: #2a3344;
+  --color-accent: #3b82f6;
+  --color-accent-dim: #2563eb;
+  --color-accent-teal: #00d4aa;
   --color-warn: #f59e0b;
   --color-danger: #ef4444;
-  --color-text: #e2e8f0;
-  --color-text-dim: #94a3b8;
+  --color-success: #22c55e;
+  --color-text: #e8edf4;
+  --color-text-dim: #8b9cb3;
+
+  /* 侧栏卡片（与 surface 统一） */
+  --color-panel-bg: #0c0e12;
+  --color-panel: #141820;
+  --color-panel-border: #2a3344;
+  --color-panel-text: #e8edf4;
+  --color-panel-dim: #8b9cb3;
+  --color-panel-muted: #64748b;
+
+  /* 中央地图区 */
+  --color-viz-bg: #0a0c10;
+  --color-viz-toolbar: #1a1f2a;
 }
 
 * {

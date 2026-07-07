@@ -20,7 +20,7 @@ const statusConfig: Record<WorkOrderStatus, { label: string; className: string; 
   completed: {
     label: '已完成',
     className: 'border-border bg-surface-3/50 text-text-dim opacity-60',
-    dot: 'bg-text-dim/40',
+    dot: 'bg-zinc-500/60',
   },
 }
 

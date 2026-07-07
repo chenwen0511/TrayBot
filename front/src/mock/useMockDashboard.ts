@@ -8,7 +8,7 @@ function lerp(a: number, b: number, t: number) {
   return a + (b - a) * t
 }
 
-const LANDMARKS = mockMapPoints.filter((p) => p.type !== 'robot')
+const DEFAULT_LANDMARKS = mockMapPoints.filter((p) => p.type !== 'robot')
 const EVENT_INTERVAL = 7000
 const CYCLE_COOLDOWN = 60000
 
@@ -19,8 +19,8 @@ export type ActiveRoute =
   | 'delivery-pickup'
   | null
 
-function getPoint(id: string) {
-  return LANDMARKS.find((p) => p.id === id)!
+function getPoint(id: string, landmarks: MapPoint[]) {
+  return landmarks.find((p) => p.id === id)!
 }
 
 function getActiveRoute(step: WorkflowStep | undefined): ActiveRoute {
@@ -49,10 +49,13 @@ function normalizeWorkOrderQueue(orders: WorkOrder[]): WorkOrder[] {
   })
 }
 
-export function useMockDashboard(enabled = true) {
+export function useMockDashboard(enabled = true, landmarks: MapPoint[] = DEFAULT_LANDMARKS) {
+  const landmarksRef = useRef(landmarks)
+  landmarksRef.current = landmarks
+
   const [robotStatus, setRobotStatus] = useState<RobotStatus>(mockRobotStatus)
   const [robotPos, setRobotPos] = useState(() => {
-    const home = LANDMARKS.find((p) => p.id === 'home')!
+    const home = landmarks.find((p) => p.id === 'home') ?? DEFAULT_LANDMARKS[0]
     return { x: home.x, y: home.y }
   })
   const [liveEvents, setLiveEvents] = useState<LiveEvent[]>([])
@@ -66,7 +69,7 @@ export function useMockDashboard(enabled = true) {
   const steps = useMemo(() => workflowSteps, [])
 
   const mapPoints: MapPoint[] = [
-    ...LANDMARKS,
+    ...landmarks,
     { id: 'robot', type: 'robot', label: 'TrayBot', x: robotPos.x, y: robotPos.y },
   ]
 
@@ -77,8 +80,9 @@ export function useMockDashboard(enabled = true) {
   const activeRoute = getActiveRoute(currentStep)
 
   const applyStep = useCallback((step: WorkflowStep) => {
+    const lm = landmarksRef.current
     if (step.map.at) {
-      const pt = getPoint(step.map.at)
+      const pt = getPoint(step.map.at, lm)
       setRobotPos({ x: pt.x, y: pt.y })
       moveRef.current = null
       setRobotStatus((prev) => ({ ...prev, mode: 'operating', speed: 0 }))
@@ -156,7 +160,7 @@ export function useMockDashboard(enabled = true) {
           completeCurrentOrder()
           setRobotStatus((prev) => ({ ...prev, mode: 'idle', taskId: null, speed: 0 }))
           moveRef.current = null
-          const home = getPoint('home')
+          const home = getPoint('home', landmarksRef.current)
           setRobotPos({ x: home.x, y: home.y })
 
           timer = setTimeout(() => {
@@ -195,6 +199,7 @@ export function useMockDashboard(enabled = true) {
             deliveredTrays: 0,
             pickup: `取料货架 A-0${Math.floor(Math.random() * 5) + 1}`,
             delivery: `送料货架 B-0${Math.floor(Math.random() * 9) + 1}`,
+            backpackCapacity: 20,
             status: 'pending' as const,
           },
         ]),
@@ -209,9 +214,10 @@ export function useMockDashboard(enabled = true) {
     const tick = () => {
       const move = moveRef.current
       if (move) {
+        const lm = landmarksRef.current
         const progress = Math.min((Date.now() - move.start) / EVENT_INTERVAL, 1)
-        const from = getPoint(move.from)
-        const to = getPoint(move.to)
+        const from = getPoint(move.from, lm)
+        const to = getPoint(move.to, lm)
         setRobotPos({ x: lerp(from.x, to.x, progress), y: lerp(from.y, to.y, progress) })
         if (progress >= 1) {
           moveRef.current = null

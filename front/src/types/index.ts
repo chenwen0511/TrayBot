@@ -79,5 +79,6 @@ export interface WorkOrder {
   deliveredTrays: number
   pickup: string
   delivery: string
+  backpackCapacity: number
   status: WorkOrderStatus
 }

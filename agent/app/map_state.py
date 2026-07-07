@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from traybot_protocol.models import LiveEventType, RobotLocation
 
+# 与 backend/maps/factory_01.json 地标对齐 (scale2d=20)
 LANDMARKS = {
-    "home": {"x": 80, "y": 320},
-    "pickup": {"x": 200, "y": 80},
-    "delivery": {"x": 520, "y": 80},
+    "home": {"x": 34, "y": 208},
+    "pickup": {"x": 294, "y": 72},
+    "delivery": {"x": 268, "y": 198},
 }
 
 EVENT_MAP: dict[LiveEventType, dict] = {

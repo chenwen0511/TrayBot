@@ -29,7 +29,7 @@ class DashboardState:
         ],
     })
     map_state: dict = field(default_factory=lambda: {
-        "robotPos": {"x": 80, "y": 320},
+        "robotPos": {"x": 34, "y": 208},
         "currentStepTitle": "",
         "activeRoute": None,
     })
