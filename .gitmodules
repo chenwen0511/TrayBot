@@ -1,3 +1,6 @@
 [submodule "shared"]
 	path = shared
 	url = ssh://git@192.168.100.100:2424/stephen/traybot-protocol.git
+[submodule "agent"]
+	path = agent
+	url = ssh://git@192.168.100.100:2424/stephen/traybot-agent.git
