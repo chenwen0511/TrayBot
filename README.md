@@ -24,9 +24,9 @@ agent（机器人端）  ──MQTT──▶  backend（云端）  ──WebSock
 
 | 组件 | 部署 | 职责 |
 |------|------|------|
-| **agent** | 机器人 onboard | LangGraph 编排、步骤执行、Thinking 逐字上报、地图状态插值 |
+| **agent** | 机器人 onboard（[traybot-agent](ssh://git@192.168.100.100:2424/stephen/traybot-agent.git) submodule） | LangGraph 编排、步骤执行、Thinking 逐字上报、地图状态插值 |
 | **backend** | 云服务器 | 工单队列（权威源）、MQTT Bridge（Agent）、Dashboard WebSocket Hub |
-| **shared** | 两端依赖 | `LiveEvent`、`WorkOrder`、消息 action 常量、MQTT Topic 约定 |
+| **shared** | 两端依赖（[traybot-protocol](ssh://git@192.168.100.100:2424/stephen/traybot-protocol.git) submodule） | `LiveEvent`、`WorkOrder`、消息 action 常量、MQTT Topic 约定 |
 | **front** | CDN / 静态托管 | 连接 `/ws/dashboard`，展示工单池与图文直播 |
 
 ### 数据流
@@ -45,16 +45,80 @@ Front (DashboardSocketClient 单例)
 
 ---
 
-## 快速开始（三端联调）
+## 多仓库与 Submodule
 
-克隆时需初始化 submodule（`shared` → traybot-protocol，`agent` → traybot-agent，且 agent 内含 `protocol/`）：
+TrayBot 主仓（本仓库）与 **Agent**、**共享协议** 已拆为独立 Git 仓库，通过 **git submodule** 挂载到 `agent/`、`shared/`。
 
-```bash
-git clone --recurse-submodules <TrayBot-url>
-# 已克隆则：git submodule update --init --recursive
+### 仓库关系
+
+```
+TrayBot（本仓库）          traybot-agent              traybot-protocol
+├── front/                 ├── app/                   ├── traybot_protocol/
+├── backend/               ├── tests/                 │   ├── models.py
+├── agent/  ──submodule──▶ │   └── protocol/ ─sub──▶  │   ├── messages.py
+└── shared/ ──submodule──────────────────────────────▶ └── mqtt_topics.py
 ```
 
-独立部署 Agent 见 [traybot-agent](ssh://git@192.168.100.100:2424/stephen/traybot-agent.git) 仓库。
+| 目录 | 独立仓库 | 远程地址 |
+|------|----------|----------|
+| `shared/` | **traybot-protocol** | `ssh://git@192.168.100.100:2424/stephen/traybot-protocol.git` |
+| `agent/` | **traybot-agent** | `ssh://git@192.168.100.100:2424/stephen/traybot-agent.git` |
+| `agent/protocol/` | **traybot-protocol**（嵌套 submodule） | 同上 |
+
+完整协议说明见 traybot-protocol 仓库 [`docs/protocol.md`](http://192.168.100.100/stephen/traybot-protocol/-/blob/master/docs/protocol.md)。Agent 部署说明见 traybot-agent 仓库 `README.md`。
+
+### 克隆
+
+```bash
+# 推荐：一次拉取主仓及全部 submodule（含 agent 内的 protocol/）
+git clone --recurse-submodules ssh://git@192.168.100.100:2424/stephen/traybot.git
+
+# 已克隆主仓、submodule 为空目录时
+cd TrayBot
+git submodule update --init --recursive
+```
+
+### 依赖安装路径
+
+各仓通过 **editable install** 引用协议包，路径因仓库布局不同：
+
+| 仓库 | requirements.txt | 说明 |
+|------|------------------|------|
+| **TrayBot/backend** | `-e ../shared` | 使用主仓 `shared/` submodule |
+| **TrayBot/agent** | `-e ./protocol` | 使用 agent 内 `protocol/` submodule |
+| **traybot-agent（独立克隆）** | `-e ./protocol` | 同上，需 `--recurse-submodules` |
+
+### 更新 Submodule
+
+```bash
+# 在 TrayBot 根目录：拉取 agent、shared 最新提交
+git submodule update --remote agent shared
+git add agent shared && git commit -m "Bump agent/protocol submodules"
+
+# 仅更新 agent 及其嵌套的 protocol
+git submodule update --remote agent
+cd agent && git submodule update --init protocol
+```
+
+在 **traybot-agent** 或 **traybot-protocol** 仓库内改代码后：先在对应独立仓 commit & push，再回到 TrayBot 更新 submodule 指针并提交。
+
+### 独立部署 Agent（无需克隆 TrayBot）
+
+```bash
+git clone --recurse-submodules ssh://git@192.168.100.100:2424/stephen/traybot-agent.git
+cd traybot-agent
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+./run_cloud.sh
+```
+
+机器人 onboard 只需 **traybot-agent** + 其 **protocol** submodule，无需 front/backend 源码。
+
+---
+
+## 快速开始（三端联调）
+
+克隆与 submodule 说明见上一节 **[多仓库与 Submodule](#多仓库与-submodule)**。
 
 **前置**：启动 MQTT Broker（见 [doc/mqtt.md](./doc/mqtt.md)）：
 
@@ -72,8 +136,9 @@ pip install -r requirements.txt
 cd front && npm install && npm run dev   # http://localhost:5173
 
 # 终端 3 — 端侧 agent（模拟机器人，同时只允许一个实例）
-cd agent && git submodule update --init --recursive
-cd agent && python3 -m venv .venv && source .venv/bin/activate
+cd agent
+git submodule update --init --recursive   # 确保 protocol/ 已检出
+python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 python -m app.main run-cloud   # 默认 --transport mqtt
 ```
@@ -265,7 +330,7 @@ npm run dev
 
 ### 工作流总览
 
-**单主图扁平实现**（LangGraph StateGraph，无 subagent），**逐盘循环**，支持多批次。流程图见 `doc/agent_workflow_main.png`。
+**单主图扁平实现**（LangGraph StateGraph，无 subagent），**逐盘循环**，支持多批次。流程图见 `agent/docs/agent_workflow_main.png`（由 `python -m app.main export-graph` 生成）。
 
 ```
 __start__
@@ -273,7 +338,7 @@ __start__
   → nav_to_pickup → arrived_pickup
   ┌─ 取料循环 ────────────────────────────────────────────────┐
   │  enter_pick → pick_pem → pick_validate → pick_execute │
-  │            → pick_in_hand → grab_success → put_backpack    │
+  │            → pick_in_hand → grab_success → put_backpack → load_decision │
   │              ↑ fail: pick_retry ──→ pick_pem        │
   │              ↑__________________________|                  │
   └────────────────────────────────────────────────────────────┘
@@ -298,9 +363,9 @@ __start__
 4. **`place_execute` → `place_verify`**：执行放置并检测
 5. 背包仍有料 → 回到 **`place_pem`** 估计下一空位，重复 2–4
 
-节点定义见 `shared/traybot_protocol/models.py` → `MAIN_GRAPH_NODES`（24 个扁平节点）。
+节点定义见 `shared/traybot_protocol/models.py` → `MAIN_GRAPH_NODES`（25 个扁平节点）。
 
-- `THINKING_NODES`：`order_received`、`batch_decision`
+- `THINKING_NODES`：`order_received`、`load_decision`、`batch_decision`
 - `MAX_PICK_RETRIES` / `MAX_PLACE_RETRIES` / `MAX_TAKE_RETRIES`：3
 - `MIN_BATTERY_PERCENT`：20（低于阈值拒绝执行）
 
@@ -510,20 +575,27 @@ pip install -r requirements.txt
 
 ---
 
-## 共享协议（shared/traybot_protocol）
+## 共享协议（traybot-protocol）
 
-Agent 与 Backend 通过 editable install 依赖：
+源码位于 **`shared/`**（git submodule → [traybot-protocol](ssh://git@192.168.100.100:2424/stephen/traybot-protocol.git)）。完整字段与 action 说明见该仓 [`docs/protocol.md`](http://192.168.100.100/stephen/traybot-protocol/-/blob/master/docs/protocol.md)。
+
+### 依赖方式
 
 ```
-# agent/requirements.txt & backend/requirements.txt
+# backend/requirements.txt（TrayBot 主仓内）
 -e ../shared
+
+# agent/requirements.txt（traybot-agent 仓内）
+-e ./protocol
 ```
+
+Backend 与 Agent **必须锁定同一版本的 traybot-protocol**（主仓内 `shared/` 与 `agent/protocol/` 可分别 bump submodule 指针）。
 
 ### 模型（`models.py`）
 
-- `LiveEvent`：`id`, `type`, `title`, `description?`, `thinking?`, `timestamp`, `visible`
+- `LiveEvent`：`id`, `type`, `title`, `description?`, `thinking?`, `imageUrl?`, `timestamp`, `visible`
 - `WorkOrder`：`id`, `total_trays`, `delivered_trays`, `pickup`, `delivery`, `backpack_capacity`, `status`
-- `LiveEventType`：21 种（含 Pick / Place 子步骤，见下表）
+- `LiveEventType`：25 种（含 Pick / Place 子步骤、`load_decision`，见 traybot-protocol 文档）
 - `MAIN_GRAPH_NODES` / `NODE_SEQUENCE`
 - 类型定义亦见 `front/src/types/index.ts`，对接时应保持一致。
 
@@ -770,11 +842,11 @@ Agent            Backend              Frontend
 
 | 文件 | 职责 |
 |------|------|
-| `shared/traybot_protocol/models.py` | LiveEvent、WorkOrder、节点序列、THINKING_NODES |
-| `agent/app/workflow/graph.py` | 主工作流 LangGraph |
-| `agent/app/workflow/nodes.py` | 全部节点实现 |
-| `agent/app/runner.py` | 逐步执行 + 导航插值 + 背包上报 |
-| `agent/app/map_state.py` | 事件 → 地图状态 |
+| `shared/traybot_protocol/models.py` | LiveEvent、WorkOrder、节点序列、THINKING_NODES（**traybot-protocol** 仓） |
+| `agent/app/workflow/graph.py` | 主工作流 LangGraph（**traybot-agent** 仓） |
+| `agent/app/workflow/nodes.py` | 全部节点实现（**traybot-agent** 仓） |
+| `agent/app/runner.py` | 逐步执行 + 导航插值 + 背包上报（**traybot-agent** 仓） |
+| `agent/app/map_state.py` | 事件 → 地图状态（**traybot-agent** 仓） |
 | `backend/app/hub.py` | 云端消息转发 |
 | `backend/app/map_loader.py` | 地图 API |
 | `backend/maps/factory_01.json` | SMT 厂房地图数据 |
