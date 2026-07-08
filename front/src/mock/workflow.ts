@@ -321,6 +321,42 @@ export function buildWorkflow(
         map: { at: 'pickup' },
         backpackTrays: backpackCount,
       })
+
+      const stillOnShelf = remaining - backpackCount
+      const goDeliver = backpackCount >= capacity || backpackCount >= remaining
+      if (goDeliver) {
+        const reason =
+          backpackCount >= capacity
+            ? `背包已满（${backpackCount}/${capacity}）`
+            : `本批已取完所需（${backpackCount}/${remaining} 盘待送）`
+        steps.push({
+          event: {
+            type: 'load_decision',
+            title: '决策：前往投递',
+            description: `本批 ${backpackCount} 盘，目标 ${MOCK_WORK_ORDER.delivery}`,
+            thinking:
+              `背包状态：现有 ${backpackCount}/${capacity} 盘。\n` +
+              `工单进度：已送达 ${delivered}/${totalTrays}，本批待送 ${backpackCount} 盘，货架剩余待取 ${stillOnShelf} 盘。\n` +
+              `判定：${reason}。\n` +
+              `决策：携带本批 ${backpackCount} 盘，导航前往 ${MOCK_WORK_ORDER.delivery} 投递。`,
+          },
+          map: { at: 'pickup' },
+        })
+      } else {
+        steps.push({
+          event: {
+            type: 'load_decision',
+            title: '决策：继续抓取',
+            description: `背包 ${backpackCount}/${capacity}，继续取料`,
+            thinking:
+              `背包状态：现有 ${backpackCount}/${capacity} 盘。\n` +
+              `工单进度：已送达 ${delivered}/${totalTrays}，货架剩余待取 ${stillOnShelf} 盘。\n` +
+              `判定：背包未满且尚有 ${stillOnShelf} 盘待取。\n` +
+              '决策：继续抓取下一盘。',
+          },
+          map: { at: 'pickup' },
+        })
+      }
     }
 
     steps.push({

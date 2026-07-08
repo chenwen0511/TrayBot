@@ -224,7 +224,54 @@ def put_backpack(state: WorkflowState) -> dict:
     )
 
 
-def route_after_put_backpack(state: WorkflowState) -> str:
+def load_decision(state: WorkflowState) -> dict:
+    """取料批次决策：继续抓取或前往投递（图文直播 Thinking）。"""
+    wo: WorkOrder = state["work_order"]
+    remaining = wo.total_trays - wo.delivered_trays
+    count = state["backpack_count"]
+    go_deliver = count >= wo.backpack_capacity or count >= remaining
+    still_on_shelf = remaining - count
+
+    if go_deliver:
+        reason = (
+            f"背包已满（{count}/{wo.backpack_capacity}）"
+            if count >= wo.backpack_capacity
+            else f"本批已取完所需（{count}/{remaining} 盘待送）"
+        )
+        thinking = (
+            f"背包状态：现有 {count}/{wo.backpack_capacity} 盘。\n"
+            f"工单进度：已送达 {wo.delivered_trays}/{wo.total_trays}，"
+            f"本批待送 {count} 盘，货架剩余待取 {still_on_shelf} 盘。\n"
+            f"判定：{reason}。\n"
+            f"决策：携带本批 {count} 盘，导航前往 {wo.delivery} 投递。"
+        )
+        return emit_event(
+            state,
+            event_type=LiveEventType.LOAD_DECISION,
+            title="决策：前往投递",
+            description=f"本批 {count} 盘，目标 {wo.delivery}",
+            thinking=thinking,
+            location=RobotLocation.PICKUP,
+        )
+
+    thinking = (
+        f"背包状态：现有 {count}/{wo.backpack_capacity} 盘。\n"
+        f"工单进度：已送达 {wo.delivered_trays}/{wo.total_trays}，"
+        f"货架剩余待取 {still_on_shelf} 盘。\n"
+        f"判定：背包未满且尚有 {still_on_shelf} 盘待取。\n"
+        f"决策：继续抓取下一盘。"
+    )
+    return emit_event(
+        state,
+        event_type=LiveEventType.LOAD_DECISION,
+        title="决策：继续抓取",
+        description=f"背包 {count}/{wo.backpack_capacity}，继续取料",
+        thinking=thinking,
+        location=RobotLocation.PICKUP,
+    )
+
+
+def route_after_load_decision(state: WorkflowState) -> str:
     wo = state["work_order"]
     remaining = wo.total_trays - wo.delivered_trays
     count = state["backpack_count"]

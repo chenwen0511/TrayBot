@@ -188,6 +188,28 @@ def test_place_retry_returns_to_place_pem():
     assert types[retry_idx + 4] == "check_in_hand"
 
 
+def test_load_decision_after_put_backpack():
+    wo = WorkOrder(
+        id="WO-test-2",
+        total_trays=2,
+        delivered_trays=0,
+        pickup="取料货架 A-01",
+        delivery="送料货架 B-09",
+        backpack_capacity=20,
+        status=WorkOrderStatus.IN_PROGRESS,
+    )
+    result = run_workflow(wo)
+    types = [e.type.value for e in result["events"]]
+    put_idx = types.index("put_backpack")
+    assert types[put_idx + 1] == "load_decision"
+    assert result["events"][put_idx + 1].title == "决策：继续抓取"
+    assert result["events"][put_idx + 1].thinking
+    last_put = max(i for i, t in enumerate(types) if t == "put_backpack")
+    assert types[last_put + 1] == "load_decision"
+    assert result["events"][last_put + 1].title == "决策：前往投递"
+    assert types[last_put + 2] == "nav_to_delivery"
+
+
 def test_backpack_count_tracked_in_events():
     wo = WorkOrder(
         id="WO-test-2",

@@ -20,6 +20,7 @@ _OPERATING_AT_PICKUP = frozenset({
     LiveEventType.PICK_RETRY,
     LiveEventType.GRAB_SUCCESS,
     LiveEventType.PUT_BACKPACK,
+    LiveEventType.LOAD_DECISION,
 })
 
 _OPERATING_AT_DELIVERY = frozenset({

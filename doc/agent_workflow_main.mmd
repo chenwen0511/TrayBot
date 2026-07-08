@@ -16,6 +16,7 @@ graph TD;
 	pick_retry(pick_retry)
 	grab_success(grab_success)
 	put_backpack(put_backpack)
+	load_decision(load_decision)
 	nav_to_delivery(nav_to_delivery)
 	arrived_delivery(arrived_delivery)
 	place_pem(place_pem)
@@ -40,6 +41,8 @@ graph TD;
 	enter_pick --> pick_pem;
 	enter_place --> place_execute;
 	grab_success --> put_backpack;
+	load_decision -.-> enter_pick;
+	load_decision -.-> nav_to_delivery;
 	nav_to_delivery --> arrived_delivery;
 	nav_to_pickup --> arrived_pickup;
 	order_received --> nav_to_pickup;
@@ -55,8 +58,7 @@ graph TD;
 	place_validate --> take_from_backpack;
 	place_verify -.-> place_retry;
 	place_verify -.-> put_shelf_success;
-	put_backpack -.-> enter_pick;
-	put_backpack -.-> nav_to_delivery;
+	put_backpack --> load_decision;
 	put_shelf_success -.-> batch_decision;
 	put_shelf_success -.-> place_pem;
 	take_from_backpack --> check_in_hand;

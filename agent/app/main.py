@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 
 from app.runner import agent_loop
-from app.workflow.graph import get_ascii_diagram, get_mermaid_diagram, run_workflow
+from app.workflow.graph import export_workflow_diagrams, get_ascii_diagram, get_mermaid_diagram, run_workflow
 from traybot_protocol.models import NODE_SEQUENCE, THINKING_NODES
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -77,14 +77,20 @@ def print_json() -> None:
     }, ensure_ascii=False, indent=2))
 
 
+def export_graph() -> None:
+    mmd_path, png_path = export_workflow_diagrams()
+    print(f"已导出 Mermaid: {mmd_path}")
+    print(f"已导出 PNG:     {png_path}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="TrayBot 端侧 Agent")
     parser.add_argument(
         "command",
         nargs="?",
         default="run-cloud",
-        choices=["graph", "run", "json", "all", "run-cloud"],
-        help="graph/run/json/all=本地测试, run-cloud=连接云端执行",
+        choices=["graph", "export-graph", "run", "json", "all", "run-cloud"],
+        help="graph=打印图, export-graph=导出 doc/, run/json/all=本地测试, run-cloud=连接云端执行",
     )
     parser.add_argument(
         "--transport",
@@ -100,6 +106,8 @@ def main() -> None:
 
     if args.command in ("graph", "all"):
         print_graph()
+    if args.command == "export-graph":
+        export_graph()
     if args.command in ("run", "all"):
         print_run_result()
     if args.command == "json":

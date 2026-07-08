@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from langgraph.graph import END, START, StateGraph
 
 from app.workflow.nodes import (
@@ -11,6 +13,7 @@ from app.workflow.nodes import (
     enter_pick,
     enter_place,
     grab_success,
+    load_decision,
     nav_to_delivery,
     nav_to_pickup,
     order_received,
@@ -31,8 +34,8 @@ from app.workflow.nodes import (
     route_after_batch,
     route_after_pick_in_hand,
     route_after_check_in_hand,
+    route_after_load_decision,
     route_after_place_verify,
-    route_after_put_backpack,
     route_after_put_shelf,
     take_from_backpack,
 )
@@ -55,6 +58,7 @@ def build_workflow_graph():
         ("pick_retry", pick_retry),
         ("grab_success", grab_success),
         ("put_backpack", put_backpack),
+        ("load_decision", load_decision),
         ("nav_to_delivery", nav_to_delivery),
         ("arrived_delivery", arrived_delivery),
         ("place_pem", place_pem),
@@ -86,9 +90,10 @@ def build_workflow_graph():
     )
     graph.add_edge("pick_retry", "pick_pem")
     graph.add_edge("grab_success", "put_backpack")
+    graph.add_edge("put_backpack", "load_decision")
     graph.add_conditional_edges(
-        "put_backpack",
-        route_after_put_backpack,
+        "load_decision",
+        route_after_load_decision,
         {"enter_pick": "enter_pick", "nav_to_delivery": "nav_to_delivery"},
     )
     graph.add_edge("nav_to_delivery", "arrived_delivery")
@@ -156,3 +161,22 @@ def get_mermaid_diagram() -> str:
 
 def get_ascii_diagram() -> str:
     return build_workflow_graph().get_graph().draw_ascii()
+
+
+def export_workflow_diagrams(
+    doc_dir: Path | None = None,
+    *,
+    background_color: str = "white",
+) -> tuple[Path, Path]:
+    """导出工作流 Mermaid 源码与 PNG（LangGraph 内置 draw_mermaid / draw_mermaid_png）。"""
+    root = doc_dir or Path(__file__).resolve().parents[3] / "doc"
+    mmd_path = root / "agent_workflow_main.mmd"
+    png_path = root / "agent_workflow_main.png"
+
+    graph = build_workflow_graph().get_graph()
+    mmd_path.write_text(get_mermaid_diagram(), encoding="utf-8")
+    graph.draw_mermaid_png(
+        output_file_path=str(png_path),
+        background_color=background_color,
+    )
+    return mmd_path, png_path

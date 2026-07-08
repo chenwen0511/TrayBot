@@ -53,6 +53,7 @@ export type LiveEventType =
   | 'pick_retry'
   | 'grab_success'
   | 'put_backpack'
+  | 'load_decision'
   | 'nav_to_delivery'
   | 'arrived_delivery'
   | 'taking_out'

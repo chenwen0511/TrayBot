@@ -21,6 +21,7 @@ class LiveEventType(StrEnum):
     PICK_RETRY = "pick_retry"
     GRAB_SUCCESS = "grab_success"
     PUT_BACKPACK = "put_backpack"
+    LOAD_DECISION = "load_decision"
     NAV_TO_DELIVERY = "nav_to_delivery"
     ARRIVED_DELIVERY = "arrived_delivery"
     TAKING_OUT = "taking_out"
@@ -121,6 +122,7 @@ MAIN_GRAPH_NODES: list[str] = [
     "pick_retry",
     "grab_success",
     "put_backpack",
+    "load_decision",
     "nav_to_delivery",
     "arrived_delivery",
     "place_pem",
@@ -140,6 +142,7 @@ NODE_SEQUENCE: list[str] = MAIN_GRAPH_NODES
 
 THINKING_NODES: frozenset[str] = frozenset({
     "order_received",
+    "load_decision",
     "batch_decision",
 })
 

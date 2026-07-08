@@ -110,6 +110,18 @@ export default function EventSnapshot({ type, activeRoute, className = '' }: Eve
           <circle cx="160" cy="48" r="4" fill="#a855f7" />
         </svg>
       )
+    case 'load_decision':
+    case 'batch_decision':
+      return (
+        <svg viewBox="0 0 320 180" className={base} xmlns="http://www.w3.org/2000/svg">
+          <rect width="320" height="180" fill="#1a2332" />
+          <circle cx="120" cy="90" r="18" fill="#10b981" opacity="0.5" />
+          <circle cx="200" cy="90" r="18" fill="#f59e0b" opacity="0.5" />
+          <path d="M138 90 L182 90" stroke="#a855f7" strokeWidth="2" markerEnd="url(#arrow)" />
+          <polygon points="182,90 174,86 174,94" fill="#a855f7" />
+          <text x="160" y="130" textAnchor="middle" fill="#a855f7" fontSize="11" fontFamily="sans-serif">决策</text>
+        </svg>
+      )
     case 'taking_out':
       return (
         <svg viewBox="0 0 320 180" className={base} xmlns="http://www.w3.org/2000/svg">
@@ -127,17 +139,6 @@ export default function EventSnapshot({ type, activeRoute, className = '' }: Eve
           <rect x="100" y="50" width="120" height="80" rx="4" fill="#243044" stroke="#22c55e" strokeWidth="2" />
           <rect x="130" y="70" width="60" height="30" rx="2" fill="#22c55e" opacity="0.4" stroke="#22c55e" strokeWidth="1" />
           <path d="M150 60 L157 67 L172 52" stroke="#22c55e" strokeWidth="3" fill="none" strokeLinecap="round" />
-        </svg>
-      )
-    case 'batch_decision':
-      return (
-        <svg viewBox="0 0 320 180" className={base} xmlns="http://www.w3.org/2000/svg">
-          <rect width="320" height="180" fill="#1a2332" />
-          <circle cx="120" cy="90" r="18" fill="#10b981" opacity="0.5" />
-          <circle cx="200" cy="90" r="18" fill="#f59e0b" opacity="0.5" />
-          <path d="M138 90 L182 90" stroke="#a855f7" strokeWidth="2" markerEnd="url(#arrow)" />
-          <polygon points="182,90 174,86 174,94" fill="#a855f7" />
-          <text x="160" y="130" textAnchor="middle" fill="#a855f7" fontSize="11" fontFamily="sans-serif">决策</text>
         </svg>
       )
     case 'return_home':
