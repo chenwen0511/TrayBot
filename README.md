@@ -6,9 +6,9 @@
 
 ```
 TrayBot/
-├── agent/          # 端侧 Agent（LangGraph 工作流，部署在机器人）
+├── agent/          # 端侧 Agent（git submodule → traybot-agent）
 ├── backend/        # 云端 Backend（工单 + MQTT Bridge + Dashboard WebSocket）
-├── shared/         # 共享协议包 traybot_protocol
+├── shared/         # 共享协议包（git submodule → traybot-protocol）
 ├── front/          # 前端监控界面 (React + Vite + Tailwind)
 ├── example/        # 示例视频等资源
 └── doc/            # 文档
@@ -47,6 +47,15 @@ Front (DashboardSocketClient 单例)
 
 ## 快速开始（三端联调）
 
+克隆时需初始化 submodule（`shared` → traybot-protocol，`agent` → traybot-agent，且 agent 内含 `protocol/`）：
+
+```bash
+git clone --recurse-submodules <TrayBot-url>
+# 已克隆则：git submodule update --init --recursive
+```
+
+独立部署 Agent 见 [traybot-agent](ssh://git@192.168.100.100:2424/stephen/traybot-agent.git) 仓库。
+
 **前置**：启动 MQTT Broker（见 [doc/mqtt.md](./doc/mqtt.md)）：
 
 ```bash
@@ -63,6 +72,7 @@ pip install -r requirements.txt
 cd front && npm install && npm run dev   # http://localhost:5173
 
 # 终端 3 — 端侧 agent（模拟机器人，同时只允许一个实例）
+cd agent && git submodule update --init --recursive
 cd agent && python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 python -m app.main run-cloud   # 默认 --transport mqtt
