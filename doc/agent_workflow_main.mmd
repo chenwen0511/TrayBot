@@ -1,0 +1,66 @@
+---
+config:
+  flowchart:
+    curve: linear
+---
+graph TD;
+	__start__([<p>__start__</p>]):::first
+	order_received(order_received)
+	nav_to_pickup(nav_to_pickup)
+	arrived_pickup(arrived_pickup)
+	enter_pick(enter_pick)
+	pick_pem(pick_pem)
+	pick_validate(pick_validate)
+	pick_execute(pick_execute)
+	pick_in_hand(pick_in_hand)
+	pick_retry(pick_retry)
+	grab_success(grab_success)
+	put_backpack(put_backpack)
+	nav_to_delivery(nav_to_delivery)
+	arrived_delivery(arrived_delivery)
+	place_pem(place_pem)
+	take_from_backpack(take_from_backpack)
+	check_in_hand(check_in_hand)
+	enter_place(enter_place)
+	place_validate(place_validate)
+	place_execute(place_execute)
+	place_verify(place_verify)
+	place_retry(place_retry)
+	put_shelf_success(put_shelf_success)
+	batch_decision(batch_decision)
+	return_home(return_home)
+	__end__([<p>__end__</p>]):::last
+	__start__ --> order_received;
+	arrived_delivery --> place_pem;
+	arrived_pickup --> enter_pick;
+	batch_decision -.-> nav_to_pickup;
+	batch_decision -.-> return_home;
+	check_in_hand -.-> enter_place;
+	check_in_hand -.-> take_from_backpack;
+	enter_pick --> pick_pem;
+	enter_place --> place_execute;
+	grab_success --> put_backpack;
+	nav_to_delivery --> arrived_delivery;
+	nav_to_pickup --> arrived_pickup;
+	order_received --> nav_to_pickup;
+	pick_execute --> pick_in_hand;
+	pick_in_hand -.-> grab_success;
+	pick_in_hand -.-> pick_retry;
+	pick_pem --> pick_validate;
+	pick_retry --> pick_pem;
+	pick_validate --> pick_execute;
+	place_execute --> place_verify;
+	place_pem --> place_validate;
+	place_retry --> place_pem;
+	place_validate --> take_from_backpack;
+	place_verify -.-> place_retry;
+	place_verify -.-> put_shelf_success;
+	put_backpack -.-> enter_pick;
+	put_backpack -.-> nav_to_delivery;
+	put_shelf_success -.-> batch_decision;
+	put_shelf_success -.-> place_pem;
+	take_from_backpack --> check_in_hand;
+	return_home --> __end__;
+	classDef default fill:#f2f0ff,line-height:1.2
+	classDef first fill-opacity:0
+	classDef last fill:#bfb6fc

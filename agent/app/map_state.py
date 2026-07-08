@@ -13,7 +13,7 @@ LANDMARKS = {
 
 _OPERATING_AT_PICKUP = frozenset({
     LiveEventType.ARRIVED_PICKUP,
-    LiveEventType.PICK_PERCEIVE,
+    LiveEventType.PICK_PEM,
     LiveEventType.PICK_VALIDATE,
     LiveEventType.PICK_EXECUTE,
     LiveEventType.PICK_IN_HAND,
@@ -24,8 +24,9 @@ _OPERATING_AT_PICKUP = frozenset({
 
 _OPERATING_AT_DELIVERY = frozenset({
     LiveEventType.ARRIVED_DELIVERY,
+    LiveEventType.PLACE_PEM,
     LiveEventType.TAKING_OUT,
-    LiveEventType.PLACE_PERCEIVE,
+    LiveEventType.CHECK_IN_HAND,
     LiveEventType.PLACE_VALIDATE,
     LiveEventType.PLACE_EXECUTE,
     LiveEventType.PLACE_VERIFY,

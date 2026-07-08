@@ -19,9 +19,9 @@ function pickSubSteps(trayIdx: number, withRetry: boolean): WorkflowStep[] {
   const steps: WorkflowStep[] = [
     {
       event: {
-        type: 'pick_perceive',
-        title: '感知并计算抓取位姿',
-        description: `扫描货架层位，计算第 ${trayIdx} 盘抓取位姿 ${slot}`,
+        type: 'pick_pem',
+        title: '抓取位姿估计',
+        description: `扫描货架层位，估计第 ${trayIdx} 盘抓取位姿 ${slot}`,
       },
       map: { at: 'pickup' },
     },
@@ -62,9 +62,9 @@ function pickSubSteps(trayIdx: number, withRetry: boolean): WorkflowStep[] {
       },
       {
         event: {
-          type: 'pick_perceive',
-          title: '感知并计算抓取位姿',
-          description: `扫描货架层位，计算第 ${trayIdx} 盘抓取位姿 ${slot}`,
+          type: 'pick_pem',
+          title: '抓取位姿估计',
+          description: `扫描货架层位，估计第 ${trayIdx} 盘抓取位姿 ${slot}`,
         },
         map: { at: 'pickup' },
       },
@@ -107,35 +107,90 @@ function pickSubSteps(trayIdx: number, withRetry: boolean): WorkflowStep[] {
   return steps
 }
 
-function placeSubSteps(slotIdx: number, withRetry: boolean): WorkflowStep[] {
+function placePemStep(slotIdx: number, isFirst: boolean): WorkflowStep {
   const slot = `B-07-L2-S${slotIdx % 4 + 1}`
-  const steps: WorkflowStep[] = [
+  return {
+    event: {
+      type: 'place_pem',
+      title: isFirst ? '放置位姿估计' : '下一放置位姿估计',
+      description: isFirst
+        ? `手腕相机扫描送料货架（夹爪空手，视野无遮挡），估计空位 ${slot} 并输出想象图`
+        : `上一盘已放置，手腕相机重新扫描货架，估计下一空位 ${slot} 并输出想象图`,
+    },
+    map: { at: 'delivery' },
+  }
+}
+
+function placeSubSteps(
+  slot: string,
+  backpackAfter: number,
+  capacity: number,
+  withRetry: boolean,
+  withTakeRetry: boolean,
+  slotIdx?: number,
+): WorkflowStep[] {
+  const takeSteps: WorkflowStep[] = [
     {
       event: {
-        type: 'place_perceive',
-        title: '感知并计算放置位姿',
-        description: `检测空位，计算第 ${slotIdx} 盘放置位姿 ${slot}`,
+        type: 'taking_out',
+        title: '从背包取出料盘',
+        description: `取出 1 盘，背包剩余 ${backpackAfter}/${capacity} 盘`,
       },
       map: { at: 'delivery' },
+      backpackTrays: backpackAfter,
     },
     {
       event: {
-        type: 'place_validate',
-        title: '预想位姿校验',
-        description: '放置路径无碰撞，料盘与槽位对齐',
-      },
-      map: { at: 'delivery' },
-    },
-    {
-      event: {
-        type: 'place_execute',
-        title: '执行放置',
-        description: '夹爪下降并释放料盘',
+        type: 'check_in_hand',
+        title: '在手检测通过',
+        description: '力矩与视觉确认料盘稳定夹持',
       },
       map: { at: 'delivery' },
     },
   ]
-  if (withRetry) {
+  if (withTakeRetry) {
+    takeSteps.unshift(
+      {
+        event: {
+          type: 'taking_out',
+          title: '从背包取出料盘',
+          description: `取出 1 盘，背包剩余 ${backpackAfter + 1}/${capacity} 盘`,
+        },
+        map: { at: 'delivery' },
+        backpackTrays: backpackAfter + 1,
+      },
+      {
+        event: {
+          type: 'check_in_hand',
+          title: '在手检测未通过',
+          description: '夹爪未检测到料盘，料盘仍在背包，重新取料',
+        },
+        map: { at: 'delivery' },
+        backpackTrays: backpackAfter + 1,
+      },
+    )
+  }
+
+  const steps: WorkflowStep[] = [
+    {
+      event: {
+        type: 'place_validate',
+        title: '预想位姿校验',
+        description: `校验 place_pem 想象图：空位 ${slot}，放置路径无碰撞，料盘与槽位对齐`,
+      },
+      map: { at: 'delivery' },
+    },
+    ...takeSteps,
+    {
+      event: {
+        type: 'place_execute',
+        title: '执行放置',
+        description: `将料盘插入 ${slot}`,
+      },
+      map: { at: 'delivery' },
+    },
+  ]
+  if (withRetry && slotIdx !== undefined) {
     steps.push(
       {
         event: {
@@ -149,23 +204,34 @@ function placeSubSteps(slotIdx: number, withRetry: boolean): WorkflowStep[] {
         event: {
           type: 'place_retry',
           title: '放置重试',
-          description: '重新夹持并校准，开始第 2 次放置',
+          description: '放置失败，料盘退回背包，返回 place_pem 重新估计位姿，开始第 2 次放置',
         },
         map: { at: 'delivery' },
+        backpackTrays: backpackAfter + 1,
       },
-      {
-        event: {
-          type: 'place_perceive',
-          title: '感知并计算放置位姿',
-          description: `检测空位，计算第 ${slotIdx} 盘放置位姿 ${slot}`,
-        },
-        map: { at: 'delivery' },
-      },
+      placePemStep(slotIdx, false),
       {
         event: {
           type: 'place_validate',
           title: '预想位姿校验',
-          description: '放置路径无碰撞，料盘与槽位对齐',
+          description: `校验 place_pem 想象图：空位 ${slot}，放置路径无碰撞，料盘与槽位对齐`,
+        },
+        map: { at: 'delivery' },
+      },
+      {
+        event: {
+          type: 'taking_out',
+          title: '从背包取出料盘',
+          description: `取出 1 盘，背包剩余 ${backpackAfter}/${capacity} 盘`,
+        },
+        map: { at: 'delivery' },
+        backpackTrays: backpackAfter,
+      },
+      {
+        event: {
+          type: 'check_in_hand',
+          title: '在手检测通过',
+          description: '力矩与视觉确认料盘稳定夹持',
         },
         map: { at: 'delivery' },
       },
@@ -173,7 +239,7 @@ function placeSubSteps(slotIdx: number, withRetry: boolean): WorkflowStep[] {
         event: {
           type: 'place_execute',
           title: '执行放置',
-          description: '夹爪下降并释放料盘（第 2 次尝试）',
+          description: `将料盘插入 ${slot}（第 2 次尝试）`,
         },
         map: { at: 'delivery' },
       },
@@ -271,32 +337,26 @@ export function buildWorkflow(
       event: {
         type: 'arrived_delivery',
         title: '抵达送料货架',
-        description: `已到达 ${MOCK_WORK_ORDER.delivery}，开始逐盘放置`,
+        description: `已到达 ${MOCK_WORK_ORDER.delivery}，先估计放置位姿再逐盘放置`,
       },
       map: { at: 'delivery' },
     })
 
     for (let i = 0; i < tripSize; i += 1) {
       const slotIdx = delivered + i + 1
+      const slot = `B-07-L2-S${slotIdx % 4 + 1}`
       const backpackBefore = tripSize - i
       const backpackAfter = backpackBefore - 1
-      steps.push({
-        event: {
-          type: 'taking_out',
-          title: '从背包取出料盘',
-          description: `取出 1 盘，背包剩余 ${backpackAfter}/${capacity} 盘`,
-        },
-        map: { at: 'delivery' },
-        backpackTrays: backpackAfter,
-      })
+      steps.push(placePemStep(slotIdx, i === 0))
       const withRetry = batch === 1 && i === 0
-      steps.push(...placeSubSteps(slotIdx, withRetry))
+      const withTakeRetry = batch === 1 && i === 0
+      steps.push(...placeSubSteps(slot, backpackAfter, capacity, withRetry, withTakeRetry, slotIdx))
       delivered += 1
       steps.push({
         event: {
           type: 'put_shelf_success',
           title: '放入货架成功',
-          description: `单盘放置完成，累计 ${delivered}/${totalTrays} 盘`,
+          description: `已插入 ${slot}，累计 ${delivered}/${totalTrays} 盘`,
         },
         map: { at: 'delivery' },
         backpackTrays: backpackAfter,

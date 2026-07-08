@@ -13,8 +13,8 @@ class LiveEventType(StrEnum):
     ORDER_RECEIVED = "order_received"
     NAV_TO_PICKUP = "nav_to_pickup"
     ARRIVED_PICKUP = "arrived_pickup"
-    # Pick subagent
-    PICK_PERCEIVE = "pick_perceive"
+    # Pick
+    PICK_PEM = "pick_pem"
     PICK_VALIDATE = "pick_validate"
     PICK_EXECUTE = "pick_execute"
     PICK_IN_HAND = "pick_in_hand"
@@ -24,8 +24,9 @@ class LiveEventType(StrEnum):
     NAV_TO_DELIVERY = "nav_to_delivery"
     ARRIVED_DELIVERY = "arrived_delivery"
     TAKING_OUT = "taking_out"
-    # Place subagent
-    PLACE_PERCEIVE = "place_perceive"
+    CHECK_IN_HAND = "check_in_hand"
+    # Place：place_pem 输出想象图 → place_validate → 取背包放置
+    PLACE_PEM = "place_pem"
     PLACE_VALIDATE = "place_validate"
     PLACE_EXECUTE = "place_execute"
     PLACE_VERIFY = "place_verify"
@@ -105,40 +106,34 @@ DEFAULT_WORK_ORDER = WorkOrder(
     status=WorkOrderStatus.IN_PROGRESS,
 )
 
-# 主编排图节点（子图 pick_tray / place_tray 为复合节点）
-ORCHESTRATOR_NODES: list[str] = [
+MAIN_GRAPH_NODES: list[str] = [
     "order_received",
     "nav_to_pickup",
     "arrived_pickup",
-    "pick_tray",
-    "put_backpack",
-    "nav_to_delivery",
-    "arrived_delivery",
-    "take_from_backpack",
-    "place_tray",
-    "batch_decision",
-    "return_home",
-]
-
-PICK_SUBGRAPH_NODES: list[str] = [
-    "pick_perceive",
+    "enter_pick",
+    "pick_pem",
     "pick_validate",
     "pick_execute",
     "pick_in_hand",
     "pick_retry",
     "grab_success",
-]
-
-PLACE_SUBGRAPH_NODES: list[str] = [
-    "place_perceive",
+    "put_backpack",
+    "nav_to_delivery",
+    "arrived_delivery",
+    "place_pem",
+    "take_from_backpack",
+    "check_in_hand",
+    "enter_place",
     "place_validate",
     "place_execute",
     "place_verify",
     "place_retry",
     "put_shelf_success",
+    "batch_decision",
+    "return_home",
 ]
 
-NODE_SEQUENCE: list[str] = ORCHESTRATOR_NODES + PICK_SUBGRAPH_NODES + PLACE_SUBGRAPH_NODES
+NODE_SEQUENCE: list[str] = MAIN_GRAPH_NODES
 
 THINKING_NODES: frozenset[str] = frozenset({
     "order_received",
@@ -147,5 +142,6 @@ THINKING_NODES: frozenset[str] = frozenset({
 
 MAX_PICK_RETRIES = 3
 MAX_PLACE_RETRIES = 3
+MAX_TAKE_RETRIES = 3
 
 MIN_BATTERY_PERCENT = 20.0

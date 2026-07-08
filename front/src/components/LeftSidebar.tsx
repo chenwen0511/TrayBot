@@ -85,7 +85,7 @@ export default function LeftSidebar({ robot, cameras, workOrders, liveEvents }: 
               作业状态: <span className="text-accent font-medium">{modeLabel}</span>
             </p>
             <p className="text-xs text-text-dim mt-1">
-              背包(当前盘数/容量):
+              当前盘数/背包容量:{' '}
               <span className="font-mono font-medium text-text">
                 {trays}/{capacity}
               </span>

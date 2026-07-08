@@ -29,7 +29,11 @@ class WorkflowState(TypedDict):
     backpack_count: int
     pick_attempt: int
     place_attempt: int
+    take_attempt: int
     pick_in_hand_ok: bool
+    check_in_hand_ok: bool
     place_verify_ok: bool
+    target_slot: str | None
+    place_scan_index: int
     events: Annotated[list[LiveEvent], _merge_events]
     step_index: int

@@ -67,7 +67,7 @@ export default function EventSnapshot({ type, activeRoute, className = '' }: Eve
     case 'nav_to_delivery':
       return <NavSnapshot route="pickup-delivery" />
     case 'arrived_pickup':
-    case 'pick_perceive':
+    case 'pick_pem':
     case 'pick_validate':
     case 'pick_execute':
     case 'pick_in_hand':
@@ -84,8 +84,9 @@ export default function EventSnapshot({ type, activeRoute, className = '' }: Eve
         </svg>
       )
     case 'arrived_delivery':
-    case 'place_perceive':
+    case 'place_pem':
     case 'place_validate':
+    case 'check_in_hand':
     case 'place_execute':
     case 'place_verify':
     case 'place_retry':

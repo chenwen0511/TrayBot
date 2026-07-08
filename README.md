@@ -107,25 +107,32 @@ rm -f /tmp/traybot-agent.lock
 
 ### 布局与功能模块
 
-12 列 Grid 布局（`front/src/App.tsx`）：
+四区暗黑主题布局（`front/src/App.tsx`）：
 
 | 区域 | 组件 | 功能 |
 |------|------|------|
-| 左 col-2 | `RobotStatusPanel` | 电量、CPU 温度、关节温度/角度、运行时长、移动控制 UI（**仅本地交互，未接后端**） |
-| 中 col-7 | `CameraGrid` + `FloorMap` | 三路 D435i MP4 循环播放 + SVG 平面图导航 |
-| 右 col-3 | `ResizableVerticalSplit` | 上：工单池；下：图文直播（**可拖拽分割线**） |
+| 顶栏 | `Header` | 标题、急停 E-STOP、告警/日志/设置、用户 admin |
+| 左栏 | `LeftSidebar` | 机器人状态（**当前盘数/背包容量: X/Y**）、系统运行状态、三路相机条 |
+| 中央 | `MapVisualization` | 3D 体素厂房地图（Three.js）、2D/3D 切换、地图工具栏 |
+| 右栏 | `RightSidebar` | 任务执行列表、实时图文直播、导航控制 |
 
 **已实现组件**：
 
 | 组件 | 路径 | 说明 |
 |------|------|------|
-| `Header` | `components/Header.tsx` | 机器人名、信号、模式、实时标识 |
-| `CameraGrid` | `components/CameraGrid.tsx` | 左手腕 / 头部 / 右手腕 video loop、全屏 |
-| `FloorMap` | `components/FloorMap.tsx` | HOME / 取料 / 送料点、机器人脉冲、路线高亮 |
-| `WorkOrderPool` | `components/WorkOrderPool.tsx` | 已完成置顶 / 进行中居中 / 排队底部，**自动滚到底部** |
+| `Header` | `components/Header.tsx` | 顶栏导航与急停 |
+| `LeftSidebar` | `components/LeftSidebar.tsx` | 机器人状态、电量环、相机条 |
+| `CameraStrip` | `components/CameraStrip.tsx` | 左手腕 / 头部 / 右手腕 MP4 循环 |
+| `MapVisualization` | `components/MapVisualization.tsx` | 地图容器、状态浮层、工具栏 |
+| `VoxelMap3D` | `components/VoxelMap3D.tsx` | Three.js 体素块渲染（`renderMode: blocks`） |
+| `VoxelMapLayer` | `components/VoxelMapLayer.tsx` | 2D 俯视图层 |
+| `TaskExecutionList` | `components/TaskExecutionList.tsx` | 右栏工单/任务列表 |
 | `LiveFeed` | `components/LiveFeed.tsx` | 图文直播、Thinking 展示、**自动滚到底部** |
-| `EventSnapshot` | `components/EventSnapshot.tsx` | 按事件 type 渲染 SVG 配图（无 `snapshotUrl` 时 fallback） |
-| `ResizableVerticalSplit` | `components/ResizableVerticalSplit.tsx` | 垂直可拖拽分割，默认比 0.38，minTop 120 / minBottom 160 |
+| `NavigationControl` | `components/NavigationControl.tsx` | 单点导航 / 自动回充 / 键盘遥控（**UI Demo，未接后端**） |
+| `EventSnapshot` | `components/EventSnapshot.tsx` | 按事件 type 渲染 SVG 配图 |
+| `WorkOrderPool` | `components/WorkOrderPool.tsx` | 工单池（旧布局组件，仍可用于拆分视图） |
+
+背包数量来源：`state.patch` 的 `robot.backpackTrays`，或从 `put_backpack` / `taking_out` 事件描述解析（`utils/backpackStatus.ts`）。
 
 ### Mock 与联调模式
 
@@ -146,6 +153,7 @@ VITE_USE_MOCK=true npm run dev
 Vite 代理（`vite.config.ts`）：
 
 - `/ws` → `http://127.0.0.1:8000`（ws: true）
+- `/api` → backend（地图配置等）
 - `/health` → backend
 
 ### WebSocket 消费（`useDashboardSocket.ts`）
@@ -189,13 +197,21 @@ Vite 代理（`vite.config.ts`）：
 
 ### 地图
 
-坐标与 Agent `map_state.py` 对齐：
-
-- home: `(80, 320)`，pickup: `(200, 80)`，delivery: `(520, 80)`
+- 地图数据：`backend/maps/factory_01.json`（15m×30m SMT 厂房，体素块 + 地标）
+- 前端启动时 `useMapConfig` 请求 `GET /api/map?map_id=factory_01`，失败时使用本地 fallback
+- 3D 渲染：`VoxelMap3D`（Three.js 实体块，非百万级体素点云）
+- Agent 2D 坐标与地图地标对齐（`agent/app/map_state.py`，scale2d=20）
+- 地标示例：home `(34,208)`，pickup `(294,72)`，delivery `(268,198)`
 - `activeRoute`：`home-pickup` | `pickup-delivery` | `delivery-home` | `delivery-pickup`
 - 导航时 Agent 以 20 帧 / 7s 高频推送 `state.patch` 更新 `robotPos`
 
-### Mock 专有行为（`mock/useMockDashboard.ts`）
+重新生成地图：
+
+```bash
+python backend/maps/generate_smt_factory.py
+```
+
+### Mock 专有行为（`mock/useMockDashboard.ts` + `mock/workflow.ts`）
 
 | 常量 | 值 |
 |------|-----|
@@ -203,9 +219,9 @@ Vite 代理（`vite.config.ts`）：
 | `CYCLE_COOLDOWN` | 60000 ms 后重跑 |
 | 新工单注入 | 每 30s 随机 pending |
 | 预置工单 | 2 completed + 1 in_progress + 2 pending |
-| 多批次 | `buildWorkflow()` 循环至 totalTrays 送完 |
+| 工作流 | `buildWorkflow()` 与 Agent 对齐：逐盘 pick/place 子步骤、多批次循环 |
 
-> **注意**：Mock 支持多批次循环；Agent 当前每工单仅执行**单批次** 11 步后即 `workorder.done`（见 Agent 章节）。
+Mock 与 Agent 均支持 **多批次**（`totalTrays > backpackCapacity`）。骨架阶段首盘抓取/放置各模拟一次失败重试。
 
 ### 摄像头 Demo
 
@@ -237,39 +253,74 @@ npm run dev
 
 部署在机器人 onboard 计算机，负责执行工作流并上报云端。
 
-### 工作流节点（11 步线性 Graph）
+### 工作流总览
+
+**单主图扁平实现**（LangGraph StateGraph，无 subagent），**逐盘循环**，支持多批次。流程图见 `doc/agent_workflow_main.png`。
 
 ```
 __start__
-  → order_received      ★ Thinking（visible=false，不进图文直播）
-  → nav_to_pickup
-  → arrived_pickup      ★ Thinking
-  → target_locked
-  → grab_success
-  → put_backpack
-  → nav_to_delivery
-  → arrived_delivery
-  → taking_out
-  → put_shelf_success
-  → return_home         ★ Thinking
-  → __end__
+  → order_received           ★ Thinking（电量自检，visible=false）
+  → nav_to_pickup → arrived_pickup
+  ┌─ 取料循环 ────────────────────────────────────────────────┐
+  │  enter_pick → pick_pem → pick_validate → pick_execute │
+  │            → pick_in_hand → grab_success → put_backpack    │
+  │              ↑ fail: pick_retry ──→ pick_pem        │
+  │              ↑__________________________|                  │
+  └────────────────────────────────────────────────────────────┘
+  → nav_to_delivery → arrived_delivery
+  ┌─ 放料循环 ────────────────────────────────────────────────┐
+  │  place_pem（放置位姿估计，夹爪空手，输出想象图）                │
+  │  → place_validate → take_from_backpack → check_in_hand      │
+  │  → enter_place → place_execute → place_verify              │
+  │            → put_shelf_success                             │
+  │              ↑ fail: place_retry → place_pem               │
+  │              ↑__________________________|                  │
+  └────────────────────────────────────────────────────────────┘
+  → batch_decision             ★ Thinking（是否继续取料 / 返回 HOME）
+  → nav_to_pickup | return_home → __end__
 ```
 
-节点序列定义于 `shared/traybot_protocol/models.py` → `NODE_SEQUENCE`。  
-`THINKING_NODES`：`order_received`、`arrived_pickup`、`return_home`。
+**放置流程**（解决手腕相机持盘遮挡）：
+
+1. **`place_pem`**：夹爪无料盘时估计放置位姿并输出想象图
+2. **`place_validate`**：校验想象图中的空位与放置路径
+3. **`take_from_backpack` → `check_in_hand`**：取料并在手检测，未检测到则重试取料（最多 3 次）
+4. **`place_execute` → `place_verify`**：执行放置并检测
+5. 背包仍有料 → 回到 **`place_pem`** 估计下一空位，重复 2–4
+
+节点定义见 `shared/traybot_protocol/models.py` → `MAIN_GRAPH_NODES`（24 个扁平节点）。
+
+- `THINKING_NODES`：`order_received`、`batch_decision`
+- `MAX_PICK_RETRIES` / `MAX_PLACE_RETRIES` / `MAX_TAKE_RETRIES`：3
+- `MIN_BATTERY_PERCENT`：20（低于阈值拒绝执行）
+
+### 工作流状态（`workflow/state.py`）
+
+| 字段 | 说明 |
+|------|------|
+| `work_order` | 当前工单 |
+| `backpack_count` | 背包内盘数（入包 +1，取出 -1） |
+| `batch_number` | 当前趟次（多批次递增） |
+| `pick_attempt` / `place_attempt` | 抓取/放置重试计数 |
+| `events` | 累积 LiveEvent（按 `id` 去重合并） |
 
 ### 目录结构
 
 ```
 agent/
 ├── app/
-│   ├── workflow/       # LangGraph graph + nodes
-│   ├── reporter.py     # CloudReporter — Legacy WebSocket 客户端
-│   ├── mqtt_reporter.py # MqttCloudReporter — 默认 MQTT 上报
-│   ├── runner.py       # 逐步执行 + 导航插值 + 工单循环
-│   ├── map_state.py    # 事件 → 地图/机器人 state patch
-│   └── main.py         # CLI + 文件锁
+│   ├── workflow/
+│   │   ├── graph.py          # 主工作流图（单图扁平）
+│   │   ├── nodes.py          # 全部节点（Pick + Place + 导航）
+│   │   ├── state.py          # WorkflowState
+│   │   └── emit.py           # 事件发射辅助
+│   ├── reporter.py           # CloudReporter — Legacy WebSocket
+│   ├── mqtt_reporter.py      # MqttCloudReporter — 默认 MQTT
+│   ├── runner.py             # 逐步执行 + 导航插值 + 背包上报 + 事件去重
+│   ├── map_state.py          # 事件 → 地图/机器人 state patch
+│   └── main.py               # CLI + 文件锁
 └── tests/
+    └── test_graph.py         # 主图节点、多批次、背包计数
 ```
 
 ### 时序常量（`runner.py` + `reporter.py`）
@@ -294,10 +345,14 @@ agent/
 
 1. 连接 MQTT Broker（或 Legacy `/ws/agent`），发 `agent.hello`（`robotId`、`version`）
 2. 阻塞等待 `workorder.assign`
-3. 执行 `run_workflow_on_cloud()` → 完成后发 `agent.workorder.done`
-4. 循环等待下一单
+3. 执行 `run_workflow_on_cloud()`：
+   - `astream(updates)` 逐步上报；子图内步骤亦产生事件
+   - `put_backpack` / `take_from_backpack` 时在 `state.patch` 附带 `robot.backpackTrays`
+   - 每盘 `put_shelf_success` 触发 `agent.workorder.progress`
+   - 已发布事件按 `id` 去重，避免子图完成时重复推送
+4. 全部送达后发 `agent.workorder.done`，循环等待下一单
 
-**单批次限制**：每次分派跑完整 11 步一次；`put_shelf_success` 累加 `batch_size` 后直接完成工单。若 `totalTrays > backpackCapacity`，工单以部分送达标记完成（多批次循环待实现）。
+**多批次**：`totalTrays > backpackCapacity` 时自动多趟取送；`batch_decision` 决策继续取料或 `return_home`。
 
 ### 文件锁（防多 Agent 并行）
 
@@ -348,6 +403,8 @@ FastAPI + MQTT Bridge + Dashboard WebSocket，不含 LangGraph。
 | `/health` | GET | 健康检查（`agent_connected`、`mqtt_bridge_connected` 等） |
 | `/api/workorders` | GET | 返回 `{ "workOrders": [...] }` |
 | `/api/workorders` | POST | 创建工单（201）；重复 id → 409 |
+| `/api/map` | GET | 地图配置（`?map_id=factory_01`） |
+| `/api/maps` | GET | 可用地图列表 |
 
 **POST body**（camelCase）：
 
@@ -419,10 +476,15 @@ FastAPI + MQTT Bridge + Dashboard WebSocket，不含 LangGraph。
 ```
 backend/
 ├── app/
-│   ├── server.py       # FastAPI 入口
+│   ├── server.py       # FastAPI 入口 + REST + WS
 │   ├── hub.py          # ConnectionHub — 连接管理 + 消息转发
 │   ├── work_orders.py  # WorkOrderStore — 工单池（权威源）
-│   └── state.py        # DashboardState — 运行时快照
+│   ├── state.py        # DashboardState — 运行时快照（含 backpackTrays）
+│   ├── map_loader.py   # 地图 JSON 加载
+│   └── mqtt_bridge.py  # MQTT Bridge
+├── maps/
+│   ├── factory_01.json # SMT 厂房地图
+│   └── generate_smt_factory.py
 └── run_server.sh       # uvicorn --host 0.0.0.0 --port 8000 --reload
 ```
 
@@ -451,10 +513,9 @@ Agent 与 Backend 通过 editable install 依赖：
 
 - `LiveEvent`：`id`, `type`, `title`, `description?`, `thinking?`, `timestamp`, `visible`
 - `WorkOrder`：`id`, `total_trays`, `delivered_trays`, `pickup`, `delivery`, `backpack_capacity`, `status`
-- `LiveEventType`：11 种（`order_received` … `return_home`）
-- 前端类型另含 `batch_decision`（UI 支持，Agent 工作流尚未产出）
-
-类型定义亦见 `front/src/types/index.ts`，对接时应保持一致。
+- `LiveEventType`：21 种（含 Pick / Place 子步骤，见下表）
+- `MAIN_GRAPH_NODES` / `NODE_SEQUENCE`
+- 类型定义亦见 `front/src/types/index.ts`，对接时应保持一致。
 
 ### 消息 action（`messages.py`）
 
@@ -522,17 +583,27 @@ Agent 与 Backend 通过 editable install 依赖：
 
 | type | 含义 |
 |------|------|
-| `order_received` | 收到工单（不进 feed） |
-| `nav_to_pickup` | 前往取料货架 |
+| `order_received` | 收到工单 + 电量自检（不进 feed） |
+| `nav_to_pickup` | 导航前往取料货架 |
 | `arrived_pickup` | 抵达取料货架 |
-| `target_locked` | 目标盘已锁定 |
-| `grab_success` | 抓取成功 |
-| `put_backpack` | 入包 |
-| `nav_to_delivery` | 前往送料货架 |
+| `pick_pem` | 抓取位姿估计（PEM） |
+| `pick_validate` | 预想抓取位姿校验 |
+| `pick_execute` | 执行抓取 |
+| `pick_in_hand` | 在手检测 |
+| `pick_retry` | 抓取重试 |
+| `grab_success` | 抓取成功（单盘） |
+| `put_backpack` | 放入背包（上报背包计数） |
+| `nav_to_delivery` | 导航前往送料货架 |
 | `arrived_delivery` | 抵达送料货架 |
-| `taking_out` | 从背包取出 |
-| `put_shelf_success` | 放架成功 |
-| `batch_decision` | 批次决策（前端 UI 支持，Agent 未产出） |
+| `taking_out` | 从背包取出（上报背包计数） |
+| `check_in_hand` | 取背包后在手检测 |
+| `place_pem` | 放置位姿估计（夹爪空手，输出想象图） |
+| `place_validate` | 校验 place_pem 想象图中的空位与放置路径 |
+| `place_execute` | 执行放置 |
+| `place_verify` | 放置检测 |
+| `place_retry` | 放置重试 |
+| `put_shelf_success` | 放入货架成功（单盘，累加 delivered） |
+| `batch_decision` | 批次决策（继续取料 / 返回 HOME）★ Thinking |
 | `return_home` | 返回 HOME |
 
 #### WorkOrder（工单）
@@ -544,6 +615,7 @@ Agent 与 Backend 通过 editable install 依赖：
 | `deliveredTrays` | number | 已送盘数 |
 | `pickup` | string | 取料货架 |
 | `delivery` | string | 送料货架 |
+| `backpackCapacity` | number | 背包容量（默认 20） |
 | `status` | `pending` \| `in_progress` \| `completed` | 工单状态 |
 
 **排队规则**（前后端均已实现）：
@@ -577,7 +649,7 @@ Agent 与 Backend 通过 editable install 依赖：
 
 ```json
 // 1) 创建事件（不含 thinking 全文）
-{ "action": "event.created", "payload": { "id": "evt-x", "type": "arrived_pickup", "title": "抵达取料货架", ... } }
+{ "action": "event.created", "payload": { "id": "evt-x", "type": "batch_decision", "title": "决策：继续取料", ... } }
 
 // 2) 流式追加（每字一帧，含完整 thinking）
 { "action": "event.thinking.delta", "payload": { "eventId": "evt-x", "delta": "定", "thinking": "定" } }
@@ -636,15 +708,22 @@ Mock 模式：后端一次给全文，前端 40ms/字打字机动画。
 {
   "action": "state.patch",
   "payload": {
-    "robot": { "mode": "navigating", "speed": 0.35, "taskId": "WO-20260629-001" },
+    "robot": {
+      "mode": "navigating",
+      "speed": 0.35,
+      "taskId": "WO-20260629-001",
+      "backpackTrays": 5
+    },
     "map": {
       "robotPos": { "x": 120, "y": 80 },
-      "currentStepTitle": "正在前往取料货架",
+      "currentStepTitle": "导航前往取料货架",
       "activeRoute": "home-pickup"
     }
   }
 }
 ```
+
+前端左栏显示：**当前盘数/背包容量: 5/20**。
 
 ### 连接快照
 
@@ -656,8 +735,8 @@ Dashboard WebSocket 连接成功后立即收到：
   "payload": {
     "liveEvents": [],
     "workOrders": [],
-    "robotStatus": { "name": "TrayBot-01", "mode": "idle", ... },
-    "mapState": { "robotPos": {"x": 80, "y": 320}, "currentStepTitle": "", "activeRoute": null }
+    "robotStatus": { "name": "TrayBot-01", "mode": "idle", "backpackTrays": 0, ... },
+    "mapState": { "robotPos": {"x": 34, "y": 208}, "currentStepTitle": "", "activeRoute": null }
   }
 }
 ```
@@ -681,16 +760,21 @@ Agent            Backend              Frontend
 
 | 文件 | 职责 |
 |------|------|
-| `shared/traybot_protocol/` | Agent / Backend 共享协议 |
-| `agent/app/workflow/` | LangGraph 工作流 |
-| `agent/app/reporter.py` | 端侧 → 云端上报 |
-| `agent/app/runner.py` | 逐步执行 + 导航插值 |
+| `shared/traybot_protocol/models.py` | LiveEvent、WorkOrder、节点序列、THINKING_NODES |
+| `agent/app/workflow/graph.py` | 主工作流 LangGraph |
+| `agent/app/workflow/nodes.py` | 全部节点实现 |
+| `agent/app/runner.py` | 逐步执行 + 导航插值 + 背包上报 |
+| `agent/app/map_state.py` | 事件 → 地图状态 |
 | `backend/app/hub.py` | 云端消息转发 |
-| `backend/app/work_orders.py` | 工单池 |
+| `backend/app/map_loader.py` | 地图 API |
+| `backend/maps/factory_01.json` | SMT 厂房地图数据 |
 | `front/src/hooks/useDashboard.ts` | Mock / 联调切换 |
 | `front/src/hooks/useDashboardSocket.ts` | WebSocket 单例消费 |
-| `front/src/components/WorkOrderPool.tsx` | 工单池 UI |
+| `front/src/hooks/useMapConfig.ts` | 地图配置加载 |
+| `front/src/components/MapVisualization.tsx` | 中央 3D 地图 |
 | `front/src/components/LiveFeed.tsx` | 图文直播 + Thinking |
+| `front/src/components/LeftSidebar.tsx` | 机器人状态 + 背包显示 |
+| `front/src/mock/workflow.ts` | Mock 工作流（与 Agent 对齐） |
 | `front/src/types/index.ts` | 前端类型定义 |
 
 ---
@@ -717,8 +801,8 @@ cd backend && ./run_tests.sh
 cd front && npm run build
 ```
 
-Agent 测试：`test_graph.py`（11 事件、线性顺序、Thinking 节点集合）。  
-Backend 测试：工单创建、重复 409、空池首单 in_progress、完成后自动启动下一单。
+Agent 测试：`test_graph.py`（编排节点、Pick/Place 子步骤、多批次送达、背包计数、Thinking 节点）。  
+Backend 测试：工单创建、重复 409、空池首单 in_progress、完成后自动启动下一单、地图 API。
 
 ---
 
@@ -733,20 +817,19 @@ Backend 测试：工单创建、重复 409、空池首单 in_progress、完成�
 | Vite proxy `ECONNREFUSED 8000` | backend 未启动 |
 | 视频无法播放 | 需 H.264 baseline + faststart；检查 `front/public/videos/` |
 | WS 连接失败 | 确认 Vite proxy `/ws`；或设 `VITE_WS_URL=ws://127.0.0.1:8000/ws/dashboard` |
-| pytest 插件冲突 | 使用 `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1` |
-| 工单只送一批 | Agent 当前单批次 11 步即 done；多批次仅 Mock 支持 |
+| pytest 插件冲突 | 使用 `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1`（见 `agent/run_tests.sh`） |
+| 地图一直加载 / 3D 卡顿 | 确认 `/api/map` 可达；体素已改为实体块渲染（~55 块） |
 | 移动控制无响应 | 面板为 Demo UI，未接真实后端 |
-| 图文直播事件重复 | 已修复：WebSocket 单例 + 事件 `id` 去重 |
+| 图文直播事件重复 | 已修复：WS 单例 + 事件 `id` 去重 + runner 发布去重 |
 
 ---
 
 ## 待实现
 
-- 真实 ROS / 硬件对接
+- 真实 ROS / 硬件对接（主图节点内替换为视觉 + 夹爪 Skill）
 - 工单持久化（数据库）
 - LLM 真推理（替换预置 Thinking 文案）
-- Agent 多批次循环（totalTrays > backpackCapacity）
 - 摄像头 WebRTC / HLS 实时流
 - 事件 `snapshotUrl` 截帧上传
-- `batch_decision` 工作流节点
-- 移动控制面板后端对接
+- 导航控制面板后端对接
+- LiDAR 点云 / 占据栅格实时地图（当前为预烘焙体素块）
