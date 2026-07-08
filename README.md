@@ -181,7 +181,7 @@ Vite 代理（`vite.config.ts`）：
 | 能力 | Mock 模式 | 联调模式 |
 |------|-----------|----------|
 | 事件来源 | `useMockDashboard` 每 7s 推一条 | WebSocket `event.created` |
-| 配图 | `EventSnapshot` SVG | 同左（`snapshotUrl` 待后端对接） |
+| 配图 | `EventSnapshot` SVG | 有 `imageUrl` 时显示 MinIO 相机帧，失败回退 SVG |
 | Thinking | 本地 **40ms/字** 打字机动画 | 后端 `thinking.delta` 逐字推送，**直接渲染全文** |
 | 滚动 | 新事件自动滚到底 | 同左 |
 | 过滤 | `order_received` 不进 feed | backend 设 `visible: false` |
@@ -575,7 +575,7 @@ Agent 与 Backend 通过 editable install 依赖：
 | `title` | string | ✓ | 主标题 |
 | `description` | string | | 说明文字 |
 | `thinking` | string | | AI 推理文字，支持流式 |
-| `snapshotUrl` | string | | 相机截图 URL（**待对接**） |
+| `imageUrl` | string | | MinIO 相机帧直链（Agent 上传，Front 直读） |
 | `timestamp` | ISO8601 | ✓ | 事件发生时间 |
 | `visible` | boolean | | 默认 `true`；`false` 时不进 feed |
 

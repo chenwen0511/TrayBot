@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from app.media.frames import maybe_attach_frame
 from app.workflow.state import WorkflowState
 from traybot_protocol.models import LiveEvent, LiveEventType, RobotLocation, WorkOrder
 
@@ -31,6 +32,7 @@ def emit_event(
         active_route=active_route,
         visible=visible,
     )
+    event = maybe_attach_frame(event, event_type=event_type)
     patch: dict = {"events": [event], "step_index": next_step(state)}
     if location is not None:
         patch["location"] = location

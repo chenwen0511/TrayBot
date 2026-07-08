@@ -80,6 +80,8 @@ export interface LiveEvent {
   description?: string
   thinking?: string
   activeRoute?: ActiveRoute
+  /** 后端 MinIO 直链（如 /traybot-live/events/...），由 Agent 上传后经 WebSocket 下发 */
+  imageUrl?: string
   timestamp: Date
 }
 

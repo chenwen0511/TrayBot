@@ -4,7 +4,7 @@ import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  server: {
+    server: {
     host: '0.0.0.0',
     port: 5173,
     strictPort: true,
@@ -13,6 +13,11 @@ export default defineConfig({
       '/ws': { target: 'http://127.0.0.1:8000', ws: true },
       '/health': 'http://127.0.0.1:8000',
       '/api': 'http://127.0.0.1:8000',
+      // MinIO 图文直播：相对路径 /traybot-live/... → 本机 9000
+      '/traybot-live': {
+        target: 'http://127.0.0.1:9000',
+        changeOrigin: true,
+      },
     },
   },
 })

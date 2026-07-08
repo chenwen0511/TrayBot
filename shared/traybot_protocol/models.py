@@ -55,6 +55,7 @@ class LiveEvent(BaseModel):
     description: str | None = None
     thinking: str | None = None
     active_route: str | None = None
+    image_url: str | None = None
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     visible: bool = True
 
@@ -72,6 +73,8 @@ class LiveEvent(BaseModel):
             data["thinking"] = self.thinking
         if self.active_route:
             data["activeRoute"] = self.active_route
+        if self.image_url:
+            data["imageUrl"] = self.image_url
         return data
 
 

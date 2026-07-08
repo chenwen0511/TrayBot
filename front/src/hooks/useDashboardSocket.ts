@@ -12,6 +12,16 @@ function wsUrl(): string {
   return `${proto}//${window.location.host}/ws/dashboard`
 }
 
+function parseImageUrl(raw: unknown): string | undefined {
+  if (!raw) return undefined
+  const url = String(raw)
+  // 仅接受后端 MinIO 直链（相对路径走 Vite/nginx 代理，绝对路径直连 MinIO）
+  if (url.startsWith('/traybot-live/') || url.startsWith('http://') || url.startsWith('https://')) {
+    return url
+  }
+  return undefined
+}
+
 function parseEvent(raw: Record<string, unknown>): LiveEvent {
   return {
     id: String(raw.id),
@@ -20,6 +30,7 @@ function parseEvent(raw: Record<string, unknown>): LiveEvent {
     description: raw.description ? String(raw.description) : undefined,
     thinking: raw.thinking ? String(raw.thinking) : undefined,
     activeRoute: raw.activeRoute ? (raw.activeRoute as LiveEvent['activeRoute']) : undefined,
+    imageUrl: parseImageUrl(raw.imageUrl),
     timestamp: new Date(String(raw.timestamp)),
   }
 }

@@ -5,7 +5,6 @@ import {
   CheckCircle2,
   ClipboardList,
   Crosshair,
-  Eye,
   GitBranch,
   Hand,
   Home,
@@ -172,8 +171,12 @@ function FeedItem({
   const Icon = eventIcons[event.type]
   const colorClass = eventColors[event.type]
   const isLight = variant === 'light'
+  const [imageFailed, setImageFailed] = useState(false)
+  const [expanded, setExpanded] = useState(false)
+  const showImage = Boolean(event.imageUrl) && !imageFailed
 
   return (
+    <>
     <div
       className={`flex gap-2 p-2 rounded-lg border animate-slide-up ${
         isLight
@@ -185,9 +188,24 @@ function FeedItem({
             : 'bg-surface-2 border-border'
       }`}
     >
-      <div className={`w-16 h-12 shrink-0 rounded overflow-hidden border ${isLight ? 'border-panel-border bg-panel-bg' : 'border-border bg-surface'}`}>
-        <EventSnapshot type={event.type} activeRoute={event.activeRoute} />
-      </div>
+      <button
+        type="button"
+        onClick={() => setExpanded(true)}
+        className={`w-16 h-12 shrink-0 rounded overflow-hidden border cursor-pointer transition-opacity hover:opacity-80 ${isLight ? 'border-panel-border bg-panel-bg' : 'border-border bg-surface'}`}
+        aria-label={`查看 ${event.title} 快照`}
+      >
+        {showImage ? (
+          <img
+            src={event.imageUrl}
+            alt={event.title}
+            className="w-full h-full object-cover pointer-events-none"
+            loading="lazy"
+            onError={() => setImageFailed(true)}
+          />
+        ) : (
+          <EventSnapshot type={event.type} activeRoute={event.activeRoute} />
+        )}
+      </button>
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
@@ -216,6 +234,38 @@ function FeedItem({
         )}
       </div>
     </div>
+
+    {expanded && (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+        onClick={() => setExpanded(false)}
+      >
+        <div className="relative w-[90vw] max-w-5xl" onClick={(e) => e.stopPropagation()}>
+          {showImage ? (
+            <img
+              src={event.imageUrl}
+              alt={event.title}
+              className="w-full rounded-lg"
+            />
+          ) : (
+            <div className="w-full aspect-[4/3] rounded-lg overflow-hidden bg-surface">
+              <EventSnapshot type={event.type} activeRoute={event.activeRoute} />
+            </div>
+          )}
+          <div className="absolute top-3 left-3 px-3 py-1.5 rounded-full bg-black/60 text-sm text-white">
+            {event.title}
+          </div>
+          <button
+            type="button"
+            onClick={() => setExpanded(false)}
+            className="absolute top-3 right-3 px-3 py-1.5 rounded-lg bg-black/60 text-sm text-white hover:bg-black/80"
+          >
+            关闭
+          </button>
+        </div>
+      </div>
+    )}
+    </>
   )
 }
 

@@ -7,6 +7,7 @@ import asyncio
 import fcntl
 import json
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -105,6 +106,8 @@ def main() -> None:
         print_json()
     if args.command == "run-cloud":
         acquire_agent_lock()
+        os.environ.setdefault("MINIO_ENABLED", "1")
+        os.environ.setdefault("MINIO_PUBLIC_URL", "proxy")
         try:
             asyncio.run(agent_loop(
                 transport=args.transport,
