@@ -1,0 +1,1479 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>仓智调度 · 多机器人拣货监控</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #f4f7f6;
+      --bg-panel: #ffffff;
+      --bg-deep: #e8eef0;
+      --fg: #0f1c1a;
+      --fg-muted: #5a6b68;
+      --primary: #0f766e;
+      --primary-soft: #ccfbf1;
+      --secondary: #14b8a6;
+      --accent: #0369a1;
+      --accent-soft: #e0f2fe;
+      --warn: #c2410c;
+      --warn-soft: #ffedd5;
+      --danger: #dc2626;
+      --danger-soft: #fee2e2;
+      --ok: #15803d;
+      --ok-soft: #dcfce7;
+      --border: #c5d4d1;
+      --grid: #d7e2e0;
+      --shelf: #94a3b8;
+      --robot-a: #0f766e;
+      --robot-b: #0369a1;
+      --robot-c: #b45309;
+      --robot-d: #0e7490;
+      --shadow: 0 1px 2px rgba(15, 28, 26, 0.06), 0 8px 24px rgba(15, 28, 26, 0.04);
+      --radius: 10px;
+      --font: "IBM Plex Sans", system-ui, sans-serif;
+      --display: "Space Grotesk", "IBM Plex Sans", sans-serif;
+      --mono: "IBM Plex Mono", ui-monospace, monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      font-family: var(--font);
+      color: var(--fg);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .stage {
+      width: 100%;
+      height: 100%;
+      max-width: 1920px;
+      max-height: 1080px;
+      margin: 0 auto;
+      background:
+        radial-gradient(1200px 600px at 10% -10%, #d8f5ef 0%, transparent 55%),
+        radial-gradient(900px 500px at 100% 0%, #dbeafe 0%, transparent 50%),
+        linear-gradient(180deg, #f7faf9 0%, var(--bg) 40%, #eef4f2 100%);
+      display: grid;
+      /* top / main / fleet — fleet is auto height so cards are never clipped */
+      grid-template-rows: 56px minmax(0, 1fr) auto;
+      gap: 10px;
+      padding: 10px 12px 12px;
+      box-sizing: border-box;
+      overflow: hidden;
+    }
+
+    button { font: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+    button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+    /* ——— Top bar ——— */
+    .topbar {
+      display: grid;
+      grid-template-columns: 280px 1fr 420px;
+      align-items: center;
+      gap: 16px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 0 18px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-mark {
+      width: 36px;
+      height: 36px;
+      border-radius: 9px;
+      background: linear-gradient(145deg, var(--primary), #0d9488 55%, var(--accent));
+      display: grid;
+      place-items: center;
+      color: #fff;
+      box-shadow: 0 6px 16px rgba(15, 118, 110, 0.28);
+    }
+
+    .brand-mark svg { width: 20px; height: 20px; }
+
+    .brand h1 {
+      font-family: var(--display);
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+    }
+
+    .brand p {
+      font-size: 11px;
+      color: var(--fg-muted);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .kpi-row {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+    }
+
+    .kpi {
+      min-width: 118px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      background: var(--bg-deep);
+      border: 1px solid transparent;
+    }
+
+    .kpi .label {
+      font-size: 10px;
+      color: var(--fg-muted);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .kpi .value {
+      font-family: var(--mono);
+      font-size: 20px;
+      font-weight: 600;
+      margin-top: 2px;
+      letter-spacing: -0.03em;
+    }
+
+    .kpi.live .value { color: var(--primary); }
+    .kpi.warn .value { color: var(--warn); }
+
+    .top-meta {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 14px;
+    }
+
+    .wo-chip {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      border: 1px solid #bae6fd;
+    }
+
+    .wo-chip .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 0 0 rgba(3, 105, 161, 0.5);
+      animation: pulse 1.8s ease-out infinite;
+    }
+
+    .wo-chip strong {
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .wo-chip span { font-size: 12px; color: var(--fg-muted); }
+
+    .clock {
+      font-family: var(--mono);
+      font-size: 15px;
+      font-weight: 500;
+      min-width: 92px;
+      text-align: right;
+    }
+
+    /* ——— Main ——— */
+    .main {
+      display: grid;
+      grid-template-columns: 340px 1fr 380px;
+      gap: 12px;
+      min-height: 0;
+    }
+
+    .panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .panel-hd {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, #fff 0%, #f9fbfb 100%);
+    }
+
+    .panel-hd h2 {
+      font-family: var(--display);
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+
+    .panel-hd .tag {
+      font-family: var(--mono);
+      font-size: 10px;
+      padding: 3px 7px;
+      border-radius: 4px;
+      background: var(--primary-soft);
+      color: var(--primary);
+      font-weight: 600;
+    }
+
+    .panel-bd {
+      padding: 12px 14px;
+      overflow: auto;
+      flex: 1;
+      min-height: 0;
+    }
+
+    /* Work order / tasks */
+    .wo-summary {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .wo-stat {
+      padding: 10px;
+      border-radius: 8px;
+      background: var(--bg-deep);
+    }
+
+    .wo-stat .k { font-size: 10px; color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+    .wo-stat .v { font-family: var(--mono); font-size: 16px; font-weight: 600; margin-top: 4px; }
+
+    .task-list { display: flex; flex-direction: column; gap: 8px; }
+
+    .task {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 11px;
+      background: #fff;
+      transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+      cursor: pointer;
+      text-align: left;
+      width: 100%;
+    }
+
+    .task:hover {
+      border-color: var(--secondary);
+      box-shadow: 0 4px 14px rgba(15, 118, 110, 0.08);
+    }
+
+    .task.active {
+      border-color: var(--primary);
+      background: linear-gradient(180deg, #f0fdfa 0%, #fff 70%);
+      box-shadow: 0 0 0 1px rgba(15, 118, 110, 0.15);
+    }
+
+    .task-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .task-id {
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--fg-muted);
+    }
+
+    .status {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 999px;
+      letter-spacing: 0.02em;
+    }
+
+    .status.running { background: var(--ok-soft); color: var(--ok); }
+    .status.queued { background: var(--accent-soft); color: var(--accent); }
+    .status.picking { background: var(--primary-soft); color: var(--primary); }
+    .status.blocked { background: var(--warn-soft); color: var(--warn); }
+    .status.done { background: var(--bg-deep); color: var(--fg-muted); }
+
+    .task-title {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .task-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      font-size: 11px;
+      color: var(--fg-muted);
+      margin-bottom: 8px;
+    }
+
+    .task-meta code {
+      font-family: var(--mono);
+      font-size: 10px;
+      background: var(--bg-deep);
+      padding: 1px 5px;
+      border-radius: 3px;
+      color: var(--fg);
+    }
+
+    .bar {
+      height: 5px;
+      border-radius: 999px;
+      background: var(--bg-deep);
+      overflow: hidden;
+    }
+
+    .bar > i {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--primary), var(--secondary));
+      width: 0%;
+      transition: width 400ms ease;
+    }
+
+    .steps {
+      margin-top: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .step {
+      display: grid;
+      grid-template-columns: 14px 1fr auto;
+      gap: 8px;
+      align-items: center;
+      font-size: 11px;
+      color: var(--fg-muted);
+    }
+
+    .step.on { color: var(--fg); font-weight: 500; }
+    .step.done { color: var(--ok); }
+
+    .step-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--border);
+      justify-self: center;
+    }
+
+    .step.on .step-dot {
+      background: var(--secondary);
+      box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.2);
+      animation: pulse 1.6s ease-out infinite;
+    }
+
+    .step.done .step-dot { background: var(--ok); }
+
+    /* Map */
+    .map-wrap { position: relative; padding: 0; }
+
+    .map-toolbar {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      right: 12px;
+      z-index: 3;
+      display: flex;
+      justify-content: space-between;
+      pointer-events: none;
+    }
+
+    .map-toolbar > * { pointer-events: auto; }
+
+    .legend {
+      display: flex;
+      gap: 8px;
+      padding: 7px 10px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid var(--border);
+      backdrop-filter: blur(8px);
+      font-size: 11px;
+      color: var(--fg-muted);
+    }
+
+    .legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .swatch {
+      width: 10px;
+      height: 10px;
+      border-radius: 3px;
+    }
+
+    .map-hint {
+      padding: 7px 10px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid var(--border);
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--fg-muted);
+    }
+
+    .floor {
+      width: 100%;
+      height: 100%;
+      background:
+        linear-gradient(90deg, transparent 49.5%, rgba(197, 212, 209, 0.45) 50%, transparent 50.5%),
+        linear-gradient(0deg, transparent 49.5%, rgba(197, 212, 209, 0.45) 50%, transparent 50.5%),
+        repeating-linear-gradient(0deg, transparent, transparent 39px, var(--grid) 40px),
+        repeating-linear-gradient(90deg, transparent, transparent 39px, var(--grid) 40px),
+        #f1f5f4;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .aisle-label {
+      position: absolute;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: #94a3b8;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      pointer-events: none;
+    }
+
+    .shelf {
+      position: absolute;
+      background: linear-gradient(180deg, #cbd5e1 0%, #94a3b8 100%);
+      border: 1px solid #64748b;
+      border-radius: 3px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.35);
+    }
+
+    .shelf::after {
+      content: attr(data-code);
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      font-family: var(--mono);
+      font-size: 9px;
+      color: rgba(15, 23, 42, 0.75);
+      font-weight: 600;
+    }
+
+    .dock {
+      position: absolute;
+      border: 2px dashed #0369a1;
+      background: rgba(3, 105, 161, 0.08);
+      border-radius: 6px;
+      display: grid;
+      place-items: center;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .path {
+      position: absolute;
+      height: 3px;
+      background: repeating-linear-gradient(90deg, var(--secondary) 0 8px, transparent 8px 14px);
+      opacity: 0.55;
+      border-radius: 2px;
+      transform-origin: left center;
+      pointer-events: none;
+    }
+
+    .robot {
+      position: absolute;
+      width: 36px;
+      height: 36px;
+      margin-left: -18px;
+      margin-top: -18px;
+      border-radius: 10px;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: box-shadow 200ms ease, transform 200ms ease;
+      z-index: 2;
+      border: 2px solid rgba(255,255,255,0.85);
+    }
+
+    .robot svg { width: 16px; height: 16px; position: absolute; top: 3px; opacity: 0.9; }
+    .robot .rid { position: relative; top: 7px; }
+
+    .robot.selected {
+      transform: scale(1.12);
+      z-index: 4;
+      box-shadow: 0 0 0 4px rgba(15, 118, 110, 0.25), 0 8px 20px rgba(15, 28, 26, 0.2);
+    }
+
+    .robot .beam {
+      position: absolute;
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      border: 2px solid currentColor;
+      opacity: 0.35;
+      animation: ring 2s ease-out infinite;
+      pointer-events: none;
+    }
+
+    .robot-a { background: var(--robot-a); color: #fff; }
+    .robot-b { background: var(--robot-b); }
+    .robot-c { background: var(--robot-c); }
+    .robot-d { background: var(--robot-d); }
+
+    .target-pin {
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      margin: -9px 0 0 -9px;
+      border-radius: 50%;
+      border: 2px solid var(--danger);
+      background: rgba(220, 38, 38, 0.15);
+      z-index: 1;
+      animation: pulse 1.4s ease-out infinite;
+      pointer-events: none;
+    }
+
+    /* Detail / camera */
+    .detail .panel-bd { display: flex; flex-direction: column; gap: 12px; }
+
+    .robot-hero {
+      display: grid;
+      grid-template-columns: 56px 1fr;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .avatar {
+      width: 56px;
+      height: 56px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-family: var(--mono);
+      font-weight: 700;
+      font-size: 13px;
+      position: relative;
+    }
+
+    .avatar .live-badge {
+      position: absolute;
+      right: -4px;
+      bottom: -4px;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--ok);
+      border: 2px solid #fff;
+    }
+
+    .robot-hero h3 {
+      font-family: var(--display);
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .robot-hero .sub {
+      font-size: 12px;
+      color: var(--fg-muted);
+      margin-top: 2px;
+    }
+
+    .state-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .state-cell {
+      padding: 9px 10px;
+      border-radius: 8px;
+      background: var(--bg-deep);
+      border: 1px solid transparent;
+    }
+
+    .state-cell .k {
+      font-size: 10px;
+      color: var(--fg-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .state-cell .v {
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 600;
+      margin-top: 3px;
+    }
+
+    .camera {
+      position: relative;
+      border-radius: 10px;
+      overflow: hidden;
+      aspect-ratio: 16 / 10;
+      background: #0b1220;
+      border: 1px solid #1e293b;
+    }
+
+    .camera-feed {
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(180deg, rgba(15, 118, 110, 0.15), transparent 40%),
+        repeating-linear-gradient(0deg, transparent 0 3px, rgba(0,0,0,0.12) 3px 4px),
+        radial-gradient(ellipse at 50% 40%, #1e3a3a 0%, #0b1220 70%);
+    }
+
+    .camera-feed::before {
+      content: "";
+      position: absolute;
+      left: 12%;
+      right: 12%;
+      top: 28%;
+      height: 38%;
+      background:
+        linear-gradient(90deg, #334155 0 8%, transparent 8% 12%, #475569 12% 20%, transparent 20% 24%, #334155 24% 32%, transparent 32% 36%, #475569 36% 44%, transparent 44% 48%, #334155 48% 56%, transparent 56% 60%, #475569 60% 68%, transparent 68% 72%, #334155 72% 80%, transparent 80% 100%);
+      opacity: 0.7;
+      transform: perspective(400px) rotateX(18deg);
+    }
+
+    .scanline {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #2dd4bf, transparent);
+      opacity: 0.7;
+      animation: scan 2.8s linear infinite;
+      z-index: 2;
+    }
+
+    .cam-hud {
+      position: absolute;
+      inset: 0;
+      z-index: 3;
+      pointer-events: none;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .cam-hud-top, .cam-hud-bot {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: #99f6e4;
+    }
+
+    .cam-live {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: rgba(220, 38, 38, 0.85);
+      color: #fff;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+    }
+
+    .cam-live i {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #fff;
+      animation: blink 1s step-end infinite;
+    }
+
+    .crosshair {
+      position: absolute;
+      left: 50%;
+      top: 48%;
+      width: 48px;
+      height: 48px;
+      margin: -24px 0 0 -24px;
+      border: 1px solid rgba(45, 212, 191, 0.5);
+      border-radius: 4px;
+    }
+
+    .crosshair::before, .crosshair::after {
+      content: "";
+      position: absolute;
+      background: rgba(45, 212, 191, 0.7);
+    }
+
+    .crosshair::before { left: 50%; top: -6px; bottom: -6px; width: 1px; }
+    .crosshair::after { top: 50%; left: -6px; right: -6px; height: 1px; }
+
+    .progress-block h4 {
+      font-size: 11px;
+      color: var(--fg-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+    }
+
+    .progress-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 6px;
+    }
+
+    .progress-row strong {
+      font-family: var(--mono);
+      font-size: 20px;
+      letter-spacing: -0.03em;
+    }
+
+    .progress-row span { font-size: 12px; color: var(--fg-muted); }
+
+    .bar.lg { height: 8px; }
+    .bar.lg > i { background: linear-gradient(90deg, var(--accent), var(--secondary)); }
+
+    .telemetry {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+
+    .tel {
+      text-align: center;
+      padding: 8px 4px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+
+    .tel .n {
+      font-family: var(--mono);
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .tel .l {
+      font-size: 10px;
+      color: var(--fg-muted);
+      margin-top: 2px;
+    }
+
+    /* Fleet strip — single-row compact cards (no second-row progress that overflows) */
+    .fleet {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      min-height: 0;
+      flex-shrink: 0;
+    }
+
+    .fleet-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 10px 12px;
+      display: grid;
+      grid-template-columns: 36px 1fr auto;
+      grid-template-rows: auto auto;
+      column-gap: 10px;
+      row-gap: 6px;
+      align-items: center;
+      cursor: pointer;
+      transition: border-color 180ms ease;
+      text-align: left;
+      width: 100%;
+      min-height: 0;
+    }
+
+    .fleet-card:hover { border-color: var(--secondary); }
+    .fleet-card.active {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 1px rgba(15, 118, 110, 0.2), var(--shadow);
+    }
+
+    .fleet-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 9px;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 700;
+      grid-row: 1 / 3;
+    }
+
+    .fleet-info {
+      min-width: 0;
+      grid-column: 2;
+      grid-row: 1;
+    }
+
+    .fleet-info h3 {
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1.2;
+    }
+
+    .fleet-info p {
+      font-size: 11px;
+      color: var(--fg-muted);
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .fleet-right {
+      text-align: right;
+      min-width: 64px;
+      grid-column: 3;
+      grid-row: 1;
+    }
+
+    .fleet-right .pct {
+      font-family: var(--mono);
+      font-size: 15px;
+      font-weight: 600;
+      line-height: 1.2;
+    }
+
+    .fleet-right .st {
+      font-size: 10px;
+      margin-top: 2px;
+      font-weight: 600;
+    }
+
+    .mini-bar {
+      grid-column: 2 / 4;
+      grid-row: 2;
+      height: 4px;
+      border-radius: 999px;
+      background: var(--bg-deep);
+      overflow: hidden;
+      margin: 0;
+    }
+
+    .mini-bar > i {
+      display: block;
+      height: 100%;
+      background: var(--secondary);
+      border-radius: inherit;
+    }
+
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(15, 118, 110, 0.45); }
+      70% { box-shadow: 0 0 0 8px rgba(15, 118, 110, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(15, 118, 110, 0); }
+    }
+
+    @keyframes ring {
+      0% { transform: scale(0.7); opacity: 0.5; }
+      100% { transform: scale(1.5); opacity: 0; }
+    }
+
+    @keyframes scan {
+      0% { top: 8%; }
+      100% { top: 88%; }
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.2; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .scanline, .robot .beam, .step.on .step-dot, .wo-chip .dot, .cam-live i, .target-pin {
+        animation: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="stage" id="stage">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 9l9-6 9 6v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9z"/>
+            <path d="M9 22V12h6v10"/>
+          </svg>
+        </div>
+        <div>
+          <h1>仓智调度</h1>
+          <p>Warehouse Fleet Ops</p>
+        </div>
+      </div>
+
+      <div class="kpi-row">
+        <div class="kpi live">
+          <div class="label">在线机器人</div>
+          <div class="value" id="kpi-online">4/4</div>
+        </div>
+        <div class="kpi">
+          <div class="label">进行中任务</div>
+          <div class="value" id="kpi-tasks">6</div>
+        </div>
+        <div class="kpi">
+          <div class="label">今日已拣</div>
+          <div class="value" id="kpi-picked">1,284</div>
+        </div>
+        <div class="kpi warn">
+          <div class="label">平均完成率</div>
+          <div class="value" id="kpi-rate">78%</div>
+        </div>
+      </div>
+
+      <div class="top-meta">
+        <div class="wo-chip">
+          <span class="dot" aria-hidden="true"></span>
+          <div>
+            <strong id="wo-id">WO-20260717-0842</strong>
+            <span> · 生鲜补货波次 A</span>
+          </div>
+        </div>
+        <div class="clock" id="clock">--:--:--</div>
+      </div>
+    </header>
+
+    <main class="main">
+      <!-- Left: work order tasks -->
+      <section class="panel">
+        <div class="panel-hd">
+          <h2>工单任务拆解</h2>
+          <span class="tag">AUTO</span>
+        </div>
+        <div class="panel-bd">
+          <div class="wo-summary">
+            <div class="wo-stat">
+              <div class="k">SKU 行数</div>
+              <div class="v">24</div>
+            </div>
+            <div class="wo-stat">
+              <div class="k">优先级</div>
+              <div class="v" style="color:var(--warn)">P1</div>
+            </div>
+            <div class="wo-stat">
+              <div class="k">截止</div>
+              <div class="v">16:30</div>
+            </div>
+            <div class="wo-stat">
+              <div class="k">拆解子任务</div>
+              <div class="v">12</div>
+            </div>
+          </div>
+
+          <div class="task-list" id="task-list"></div>
+        </div>
+      </section>
+
+      <!-- Center: map -->
+      <section class="panel map-wrap">
+        <div class="map-toolbar">
+          <div class="legend">
+            <span><i class="swatch" style="background:var(--robot-a)"></i>R-01</span>
+            <span><i class="swatch" style="background:var(--robot-b)"></i>R-02</span>
+            <span><i class="swatch" style="background:var(--robot-c)"></i>R-03</span>
+            <span><i class="swatch" style="background:var(--robot-d)"></i>R-04</span>
+            <span><i class="swatch" style="background:#94a3b8"></i>货架</span>
+            <span><i class="swatch" style="background:#0369a1"></i>接驳口</span>
+          </div>
+          <div class="map-hint" id="map-hint">ZONE · B2 冷链巷道</div>
+        </div>
+        <div class="floor" id="floor" aria-label="仓库平面图"></div>
+      </section>
+
+      <!-- Right: selected robot -->
+      <section class="panel detail">
+        <div class="panel-hd">
+          <h2>机器人实时视图</h2>
+          <span class="tag" id="detail-tag">R-01</span>
+        </div>
+        <div class="panel-bd">
+          <div class="robot-hero">
+            <div class="avatar robot-a" id="detail-avatar">
+              R-01
+              <span class="live-badge" title="在线"></span>
+            </div>
+            <div>
+              <h3 id="detail-name">拾取机 R-01</h3>
+              <div class="sub" id="detail-sub">执行中 · 任务 T-03 · 货架 B2-07</div>
+            </div>
+          </div>
+
+          <div class="state-grid">
+            <div class="state-cell">
+              <div class="k">自身状态</div>
+              <div class="v" id="st-mode">拣货中</div>
+            </div>
+            <div class="state-cell">
+              <div class="k">位置</div>
+              <div class="v" id="st-pos">B2 · (42, 18)</div>
+            </div>
+            <div class="state-cell">
+              <div class="k">电量</div>
+              <div class="v" id="st-batt">86%</div>
+            </div>
+            <div class="state-cell">
+              <div class="k">载重</div>
+              <div class="v" id="st-load">12.4 / 30 kg</div>
+            </div>
+            <div class="state-cell">
+              <div class="k">速度</div>
+              <div class="v" id="st-spd">0.8 m/s</div>
+            </div>
+            <div class="state-cell">
+              <div class="k">障碍物</div>
+              <div class="v" id="st-obs">无</div>
+            </div>
+          </div>
+
+          <div class="camera" aria-label="实时相机">
+            <div class="camera-feed"></div>
+            <div class="scanline"></div>
+            <div class="crosshair"></div>
+            <div class="cam-hud">
+              <div class="cam-hud-top">
+                <span class="cam-live"><i></i> LIVE</span>
+                <span id="cam-id">CAM · R-01 · FRONT</span>
+              </div>
+              <div class="cam-hud-bot">
+                <span id="cam-sku">SKU · YN-8842 冷鲜牛奶</span>
+                <span id="cam-fps">30 FPS · H.265</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="progress-block">
+            <h4>当前子任务进度</h4>
+            <div class="progress-row">
+              <strong id="prog-pct">62%</strong>
+              <span id="prog-label">3 / 5 件已取</span>
+            </div>
+            <div class="bar lg"><i id="prog-bar" style="width:62%"></i></div>
+          </div>
+
+          <div class="telemetry">
+            <div class="tel">
+              <div class="n" id="tel-cpu">34%</div>
+              <div class="l">算力</div>
+            </div>
+            <div class="tel">
+              <div class="n" id="tel-net">18 ms</div>
+              <div class="l">链路</div>
+            </div>
+            <div class="tel">
+              <div class="n" id="tel-temp">41°C</div>
+              <div class="l">电机温</div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="fleet" id="fleet"></footer>
+  </div>
+
+  <script>
+    const ROBOT_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="8" width="16" height="10" rx="2"/><circle cx="9" cy="13" r="1.5" fill="currentColor"/><circle cx="15" cy="13" r="1.5" fill="currentColor"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg>`;
+
+    const robots = [
+      {
+        id: "R-01",
+        name: "拾取机 R-01",
+        cls: "robot-a",
+        mode: "拣货中",
+        zone: "B2",
+        x: 420, y: 280,
+        target: { x: 520, y: 220 },
+        batt: 86, load: "12.4 / 30 kg", spd: "0.8 m/s", obs: "无",
+        progress: 62, picked: "3 / 5 件已取",
+        sku: "YN-8842 冷鲜牛奶",
+        task: "T-03 · 货架 B2-07",
+        path: { left: 300, top: 280, w: 220, rot: -18 },
+        steps: [
+          { t: "领取工单行", s: "done" },
+          { t: "导航至 B2-07", s: "done" },
+          { t: "视觉确认货位", s: "on" },
+          { t: "抓取 ×5", s: "queued" },
+          { t: "送至接驳口 D1", s: "queued" },
+        ],
+      },
+      {
+        id: "R-02",
+        name: "拾取机 R-02",
+        cls: "robot-b",
+        mode: "导航中",
+        zone: "A3",
+        x: 720, y: 420,
+        target: { x: 780, y: 180 },
+        batt: 72, load: "4.1 / 30 kg", spd: "1.2 m/s", obs: "无",
+        progress: 35, picked: "路径 35%",
+        sku: "HZ-2201 纸品卷",
+        task: "T-05 · 货架 A3-12",
+        path: { left: 620, top: 420, w: 180, rot: -55 },
+        steps: [
+          { t: "领取工单行", s: "done" },
+          { t: "规划避障路径", s: "done" },
+          { t: "驶向 A3-12", s: "on" },
+          { t: "拣取 8 件", s: "queued" },
+          { t: "回充 / 交接", s: "queued" },
+        ],
+      },
+      {
+        id: "R-03",
+        name: "拾取机 R-03",
+        cls: "robot-c",
+        mode: "等待通道",
+        zone: "C1",
+        x: 980, y: 520,
+        target: { x: 1040, y: 360 },
+        batt: 54, load: "21.0 / 30 kg", spd: "0.0 m/s", obs: "拥堵 · 人车混行",
+        progress: 81, picked: "9 / 11 件已取",
+        sku: "SP-1109 调味油",
+        task: "T-08 · 货架 C1-03",
+        path: { left: 900, top: 520, w: 140, rot: -40 },
+        steps: [
+          { t: "领取工单行", s: "done" },
+          { t: "完成主拣区", s: "done" },
+          { t: "等待放行", s: "on" },
+          { t: "补拣 2 件", s: "queued" },
+          { t: "送至接驳口 D2", s: "queued" },
+        ],
+      },
+      {
+        id: "R-04",
+        name: "拾取机 R-04",
+        cls: "robot-d",
+        mode: "排队中",
+        zone: "D0",
+        x: 260, y: 620,
+        target: { x: 300, y: 300 },
+        batt: 93, load: "0.0 / 30 kg", spd: "0.0 m/s", obs: "无",
+        progress: 8, picked: "排队位 2",
+        sku: "待分配",
+        task: "T-11 · 待命接单",
+        path: null,
+        steps: [
+          { t: "工单入队", s: "done" },
+          { t: "资源调度匹配", s: "on" },
+          { t: "领取货位清单", s: "queued" },
+          { t: "执行拣货", s: "queued" },
+          { t: "交接确认", s: "queued" },
+        ],
+      },
+    ];
+
+    const tasks = [
+      {
+        id: "T-03", robot: "R-01", title: "冷链区 · 牛奶补货",
+        status: "picking", statusLabel: "拣货中",
+        meta: ["货架 <code>B2-07</code>", "数量 <code>5</code>", "ETA <code>4 min</code>"],
+        progress: 62,
+        steps: robots[0].steps,
+      },
+      {
+        id: "T-05", robot: "R-02", title: "干货区 · 纸品拣选",
+        status: "running", statusLabel: "导航中",
+        meta: ["货架 <code>A3-12</code>", "数量 <code>8</code>", "ETA <code>7 min</code>"],
+        progress: 35,
+        steps: robots[1].steps,
+      },
+      {
+        id: "T-08", robot: "R-03", title: "调料区 · 油品集拣",
+        status: "blocked", statusLabel: "通道占用",
+        meta: ["货架 <code>C1-03</code>", "数量 <code>11</code>", "ETA <code>11 min</code>"],
+        progress: 81,
+        steps: robots[2].steps,
+      },
+      {
+        id: "T-11", robot: "R-04", title: "待调度 · 下一波次",
+        status: "queued", statusLabel: "排队",
+        meta: ["优先级 <code>P2</code>", "预计 <code>16:05</code>"],
+        progress: 8,
+        steps: robots[3].steps,
+      },
+      {
+        id: "T-02", robot: "—", title: "已完成 · 蔬果交接",
+        status: "done", statusLabel: "完成",
+        meta: ["货架 <code>B1-02</code>", "数量 <code>14</code>"],
+        progress: 100,
+        steps: [
+          { t: "全部步骤", s: "done" },
+        ],
+      },
+    ];
+
+    let selected = "R-01";
+
+    function pad(n) { return String(n).padStart(2, "0"); }
+
+    function tickClock() {
+      const d = new Date();
+      document.getElementById("clock").textContent =
+        `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    }
+
+    function buildFloor() {
+      const floor = document.getElementById("floor");
+      floor.innerHTML = "";
+
+      const shelves = [
+        { left: 80, top: 80, w: 160, h: 36, code: "A1" },
+        { left: 80, top: 140, w: 160, h: 36, code: "A2" },
+        { left: 80, top: 200, w: 160, h: 36, code: "A3" },
+        { left: 320, top: 80, w: 200, h: 36, code: "B1" },
+        { left: 320, top: 140, w: 200, h: 36, code: "B2" },
+        { left: 320, top: 200, w: 200, h: 36, code: "B3" },
+        { left: 600, top: 80, w: 180, h: 36, code: "C1" },
+        { left: 600, top: 140, w: 180, h: 36, code: "C2" },
+        { left: 600, top: 200, w: 180, h: 36, code: "C3" },
+        { left: 860, top: 80, w: 160, h: 36, code: "D1" },
+        { left: 860, top: 140, w: 160, h: 36, code: "D2" },
+        { left: 80, top: 320, w: 160, h: 36, code: "E1" },
+        { left: 320, top: 320, w: 200, h: 36, code: "E2" },
+        { left: 600, top: 320, w: 180, h: 36, code: "E3" },
+        { left: 860, top: 320, w: 160, h: 36, code: "E4" },
+        { left: 80, top: 400, w: 160, h: 36, code: "F1" },
+        { left: 320, top: 400, w: 200, h: 36, code: "F2" },
+        { left: 600, top: 400, w: 180, h: 36, code: "F3" },
+      ];
+
+      shelves.forEach((s) => {
+        const el = document.createElement("div");
+        el.className = "shelf";
+        el.style.cssText = `left:${s.left}px;top:${s.top}px;width:${s.w}px;height:${s.h}px`;
+        el.dataset.code = s.code;
+        floor.appendChild(el);
+      });
+
+      [
+        { left: 40, top: 560, w: 120, h: 70, t: "接驳 D1" },
+        { left: 900, top: 560, w: 120, h: 70, t: "接驳 D2" },
+      ].forEach((d) => {
+        const el = document.createElement("div");
+        el.className = "dock";
+        el.style.cssText = `left:${d.left}px;top:${d.top}px;width:${d.w}px;height:${d.h}px`;
+        el.textContent = d.t;
+        floor.appendChild(el);
+      });
+
+      [
+        { left: 20, top: 50, t: "Aisle A" },
+        { left: 280, top: 50, t: "Aisle B" },
+        { left: 560, top: 50, t: "Aisle C" },
+        { left: 820, top: 50, t: "Aisle D" },
+      ].forEach((a) => {
+        const el = document.createElement("div");
+        el.className = "aisle-label";
+        el.style.cssText = `left:${a.left}px;top:${a.top}px`;
+        el.textContent = a.t;
+        floor.appendChild(el);
+      });
+
+      robots.forEach((r) => {
+        if (r.path) {
+          const p = document.createElement("div");
+          p.className = "path";
+          p.style.cssText = `left:${r.path.left}px;top:${r.path.top}px;width:${r.path.w}px;transform:rotate(${r.path.rot}deg)`;
+          floor.appendChild(p);
+        }
+
+        const pin = document.createElement("div");
+        pin.className = "target-pin";
+        pin.style.left = r.target.x + "px";
+        pin.style.top = r.target.y + "px";
+        pin.title = `${r.id} 目标点`;
+        floor.appendChild(pin);
+
+        const bot = document.createElement("button");
+        bot.type = "button";
+        bot.className = `robot ${r.cls}` + (selected === r.id ? " selected" : "");
+        bot.style.left = r.x + "px";
+        bot.style.top = r.y + "px";
+        bot.dataset.id = r.id;
+        bot.innerHTML = `<span class="beam"></span>${ROBOT_ICON}<span class="rid">${r.id}</span>`;
+        bot.addEventListener("click", () => selectRobot(r.id));
+        floor.appendChild(bot);
+      });
+    }
+
+    function renderTasks() {
+      const list = document.getElementById("task-list");
+      list.innerHTML = tasks.map((t) => {
+        const active = robots.find((r) => r.id === selected)?.task?.startsWith(t.id);
+        const showSteps = active || t.robot === selected;
+        return `
+          <button type="button" class="task ${showSteps ? "active" : ""}" data-robot="${t.robot}">
+            <div class="task-top">
+              <span class="task-id">${t.id}${t.robot !== "—" ? " · " + t.robot : ""}</span>
+              <span class="status ${t.status}">${t.statusLabel}</span>
+            </div>
+            <div class="task-title">${t.title}</div>
+            <div class="task-meta">${t.meta.join("")}</div>
+            <div class="bar"><i style="width:${t.progress}%"></i></div>
+            ${showSteps ? `<div class="steps">${t.steps.map((s) => `
+              <div class="step ${s.s}">
+                <span class="step-dot"></span>
+                <span>${s.t}</span>
+                <span>${s.s === "done" ? "OK" : s.s === "on" ? "NOW" : ""}</span>
+              </div>`).join("")}</div>` : ""}
+          </button>`;
+      }).join("");
+
+      list.querySelectorAll(".task").forEach((el) => {
+        el.addEventListener("click", () => {
+          const rid = el.dataset.robot;
+          if (rid && rid !== "—") selectRobot(rid);
+        });
+      });
+    }
+
+    function renderFleet() {
+      const fleet = document.getElementById("fleet");
+      fleet.innerHTML = robots.map((r) => `
+        <button type="button" class="fleet-card ${selected === r.id ? "active" : ""}" data-id="${r.id}">
+          <div class="fleet-avatar ${r.cls}">${r.id}</div>
+          <div class="fleet-info">
+            <h3>${r.name}</h3>
+            <p>${r.task}</p>
+          </div>
+          <div class="fleet-right">
+            <div class="pct">${r.progress}%</div>
+            <div class="st" style="color:${r.mode.includes("等待") || r.mode.includes("排队") ? "var(--warn)" : "var(--ok)"}">${r.mode}</div>
+          </div>
+          <div class="mini-bar"><i style="width:${r.progress}%;background:currentColor;color:inherit" class="${r.cls}"></i></div>
+        </button>
+      `).join("");
+
+      // fix mini-bar color via class on parent avatar color
+      fleet.querySelectorAll(".fleet-card").forEach((card) => {
+        const r = robots.find((x) => x.id === card.dataset.id);
+        const bar = card.querySelector(".mini-bar > i");
+        const colors = { "robot-a": "#0f766e", "robot-b": "#0369a1", "robot-c": "#b45309", "robot-d": "#0e7490" };
+        bar.style.background = colors[r.cls];
+        card.addEventListener("click", () => selectRobot(r.id));
+      });
+    }
+
+    function renderDetail() {
+      const r = robots.find((x) => x.id === selected);
+      document.getElementById("detail-tag").textContent = r.id;
+      const av = document.getElementById("detail-avatar");
+      av.className = `avatar ${r.cls}`;
+      av.innerHTML = `${r.id}<span class="live-badge"></span>`;
+      document.getElementById("detail-name").textContent = r.name;
+      document.getElementById("detail-sub").textContent = `执行中 · ${r.task}`;
+      document.getElementById("st-mode").textContent = r.mode;
+      document.getElementById("st-pos").textContent = `${r.zone} · (${Math.round(r.x / 10)}, ${Math.round(r.y / 10)})`;
+      document.getElementById("st-batt").textContent = r.batt + "%";
+      document.getElementById("st-load").textContent = r.load;
+      document.getElementById("st-spd").textContent = r.spd;
+      document.getElementById("st-obs").textContent = r.obs;
+      document.getElementById("st-obs").style.color = r.obs === "无" ? "" : "var(--warn)";
+      document.getElementById("cam-id").textContent = `CAM · ${r.id} · FRONT`;
+      document.getElementById("cam-sku").textContent = `SKU · ${r.sku}`;
+      document.getElementById("prog-pct").textContent = r.progress + "%";
+      document.getElementById("prog-label").textContent = r.picked;
+      document.getElementById("prog-bar").style.width = r.progress + "%";
+      document.getElementById("map-hint").textContent = `ZONE · ${r.zone} · 目标 (${Math.round(r.target.x / 10)}, ${Math.round(r.target.y / 10)})`;
+    }
+
+    function selectRobot(id) {
+      selected = id;
+      buildFloor();
+      renderTasks();
+      renderFleet();
+      renderDetail();
+    }
+
+    // Simulate live movement + telemetry
+    function simulate() {
+      robots.forEach((r, i) => {
+        if (r.mode === "排队中") return;
+        const dx = r.target.x - r.x;
+        const dy = r.target.y - r.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist > 4 && !r.mode.includes("等待")) {
+          const step = 0.6 + i * 0.15;
+          r.x += (dx / dist) * step;
+          r.y += (dy / dist) * step;
+          if (Math.random() < 0.04 && r.progress < 98) r.progress += 1;
+        } else if (r.mode === "导航中" && dist <= 4) {
+          r.mode = "拣货中";
+          r.spd = "0.3 m/s";
+        }
+
+        if (r.id === selected) {
+          const jitter = (n, a) => Math.max(0, Math.round(n + (Math.random() - 0.5) * a));
+          document.getElementById("tel-cpu").textContent = jitter(30 + i * 4, 8) + "%";
+          document.getElementById("tel-net").textContent = jitter(16 + i * 3, 6) + " ms";
+          document.getElementById("tel-temp").textContent = jitter(40 + i, 3) + "°C";
+          document.getElementById("st-pos").textContent =
+            `${r.zone} · (${Math.round(r.x / 10)}, ${Math.round(r.y / 10)})`;
+          document.getElementById("prog-pct").textContent = r.progress + "%";
+          document.getElementById("prog-bar").style.width = r.progress + "%";
+        }
+      });
+
+      // update robot DOM positions without full rebuild when possible
+      document.querySelectorAll(".robot").forEach((el) => {
+        const r = robots.find((x) => x.id === el.dataset.id);
+        if (!r) return;
+        el.style.left = r.x + "px";
+        el.style.top = r.y + "px";
+      });
+
+      // light KPI tick
+      const picked = document.getElementById("kpi-picked");
+      if (Math.random() < 0.08) {
+        const n = parseInt(picked.textContent.replace(",", ""), 10) + 1;
+        picked.textContent = n.toLocaleString("en-US");
+      }
+      const rate = Math.round(robots.reduce((s, r) => s + r.progress, 0) / robots.length);
+      document.getElementById("kpi-rate").textContent = rate + "%";
+    }
+
+    // boot
+    tickClock();
+    setInterval(tickClock, 1000);
+    selectRobot("R-01");
+    setInterval(simulate, 120);
+  </script>
+</body>
+</html>
